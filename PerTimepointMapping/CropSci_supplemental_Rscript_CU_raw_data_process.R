@@ -296,7 +296,7 @@ PM111_GI3_1920_BLUP=gapit_blup(TP3_GI3_1920.lm, 'GI3')
 
 ##### load and process preharvest sprouting data #####
 
-load("~/allGGSPHSdata.RData")
+load("PhenotypeData/RawData/allGGSPHSdata.RData")
 phs.lm=lmer(PHS ~  Env + (1|Env:Harvest) + Entry +(1|Env:Rep) , data=allGGSphs) #GGS19, GGS20
 
 get_entry_fixed_Effects_phs = function(model, trait){
