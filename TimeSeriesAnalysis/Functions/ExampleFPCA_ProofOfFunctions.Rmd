@@ -1,0 +1,270 @@
+---
+title: "Example FPCA and proof of function"
+author: "Travis Rooney"
+date: "2/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a markdown file to show proof of the function `FPCA_function` for performing FPCA, Functional Principle Component Analysis, on time series data over time as described in Miao et al (2020) [<http://www.plantphysiol.org/content/183/4/1898.short>]. The code and process for analyzing the data is based on the scripts that are published alongside that paper.
+
+Analyses using this form of FPCA may have a significant advantage over use of parameterized models due to the flexibility of fits. As we saw in the logistic fits analyses, for some taxa logistic models describing dormancy break did not work, as the lines *always* had dormancy broken. Using FPCA, there is no assumption of a particular model form that these GE3 curves need to take and so it should be able to account for all the different 'types' of curves that we see in this data. To start we are going to use BLUEs as the input, but maybe once we see results from this we can use raw data, as we get more involved in these packages.
+
+The basic work flow is to take the data over time, fit a mean function to that data, decompose that mean function into its eigen functions as defined by Miao et al (2020) and others, then build the curves for each line out of those eigen functions. This takes the form of PC scores (weights) assigned to each of the functions for each line. For example, if the eigen functions are $f_1(t)$ and $f_2(t)$ then the curves can be built with by summing $y(t) = a_1 * f_1(t) +a_2 * f_2(t)$ where $a_1$ and $a_2$ would be the PC scores for the whose GE3 curve is described by $y(t)$. Most commonly things are looked at as a deviation from the mean function, so to recover the actual values of the line at that point the mean function, $\mu (t)$, needs to be added back in. If the data is not balanced over time - ie not all lines have observations at all time points then smoothing splines or other fitting methods can be used to estimate data points which can then be used.
+
+In this script we first run through the process of fitting FPCA to data and showing some of the output graphs that we can make to show the fitted GE3 curves. Followed by that a function `FPCA_fuction()` is used to complete the remainder of the FPCAs. 
+
+## Fitting GE3 with FPCA, fully worked out
+<details>
+  <summary>Click to Expand</summary>
+
+To start load dependencies and data. `tuning_nointera` is an R function using generalized cross validation to tune the smoothing parameter used in fitting these curves. 
+
+
+```{r load libraries and data, echo=TRUE}
+library(fda) ; library(magic) ; library(reshape2) ; 
+library(dplyr); library(tidyr); library(ggplot2); library(patchwork); library(knitr)
+
+source("pca_fun.R")
+source("pca_score.R")
+source("tuning_nointer.R")
+source("FPCA_function.R")
+
+setwd(rprojroot::find_rstudio_root_file())
+load('SpringBarley/PhenotypeData/ProcessedData/2020/GGS2020_BLUE_summary_allTP.RData') #brings in the BLUEs for this as `all_BLUE`
+
+# function for tuning parameter selection using GCV
+tuning_nointera = function(lower, upper, Omega, Xmat, Y.vec, xlen){
+  lam.list=exp(seq(lower,upper,1))
+  gcv=rep(0,length(lam.list))
+  for(ii in 1:length(lam.list))
+  {
+    A <- solve(t(Xmat)%*%Xmat+adiag(Omega*lam.list[ii]))
+    Y.vec.hat <- (Xmat%*%A) %*% (t(Xmat)%*%Y.vec)
+    diag.mean <- sum(diag(t(Xmat)%*%Xmat%*%A))/(dim(Xmat)[1]) # the original mean(diag(Hmat))
+    gcv[ii] <- mean((Y.vec-Y.vec.hat)^2)/(1-diag.mean)^2
+  }
+  ind=which(gcv==min(gcv))
+  lam.list[ind]
+}
+```
+
+
+We will not be doing any imputation in this data, and will just use the BLUEs for the `GE3` as they are
+
+To start we filter out lines that do not have the full 6 time points of observation. We then take an empirical estimate for mu at each time point. This is then plotted against the rest of the `GE3` curves as the green line. 
+
+```{r Subset of all_BLUE that have 6 obs}
+GreaterThan5Obs = all_BLUE %>% group_by(taxa) %>% summarise(n()) %>% dplyr::filter(`n()` > 5) %>% select(taxa) 
+Taxa.Blues = all_BLUE %>% filter(taxa %in% GreaterThan5Obs$taxa) %>% 
+  select(taxa,GE3,TP,PM_date) %>% mutate(time = PM_date-5) 
+NumLines = dim(Taxa.Blues %>% group_by(taxa) %>% summarize())[1] #Should be 487
+
+#arrange all lines by taxa, instead of timepoint, 
+Taxa.BluesbyTaxa = Taxa.Blues %>% arrange(taxa) %>% mutate(GE3 = ifelse(GE3<0, 0.001, ifelse(GE3>1, 1, GE3)))
+
+GE3.Y.vec = Taxa.BluesbyTaxa$GE3	# vectorize the observation values
+time.vec = Taxa.BluesbyTaxa$time	# vectorize the time points
+
+ylimit = range(GE3.Y.vec)	# range of observation values
+tlimit = range(time.vec)	# range of measurement time points
+## draw a picture for the raw data ### ####
+# empirical mean curve
+time.points = unique(sort(time.vec))
+mu.emp = rep(0,length(time.points))
+for (i in 1:length(time.points)){
+  mu.emp[i] = mean(GE3.Y.vec[time.vec==time.points[i]])
+}
+
+# raw data with the empirical mean function
+ggplot(Taxa.BluesbyTaxa)+geom_line(aes(x = time, y = GE3, group = taxa))+
+  geom_line(data = data.frame(time = time.points, muEmp = mu.emp), aes(x = time, y = muEmp), color = 'green', size = 2)
+```
+
+The basis that we are going to use for the mean function is a quadratic spline (order == 3) with 2 interior knots. The mean function based on empirical or fit with a spline is shown here. 
+
+```{r stage 0 setup before analysis}
+### basis functions ###
+Knot.int = 2	# Knot.int is the number of interior knots
+order = 3 # quadratic splines
+knots.loc = tlimit[1] + (tlimit[2]-tlimit[1])*(1:Knot.int)/(1+Knot.int)	# time points of interios knots
+K_num_basis = length(knots.loc) + order 				# number of basis functions
+basis.fnct = create.bspline.basis(tlimit,K_num_basis,norder=order)
+
+### penalty matrix ###
+Omega = inprod(basis.fnct,basis.fnct,2,2)			# penalty matrix
+inte1 = kronecker(inprod(basis.fnct,basis.fnct,2,2),inprod(basis.fnct,basis.fnct))
+inte2 = kronecker(inprod(basis.fnct,basis.fnct,1,1),inprod(basis.fnct,basis.fnct,1,1))
+inte3 = kronecker(inprod(basis.fnct,basis.fnct),inprod(basis.fnct,basis.fnct,2,2))
+Omega2 = inte1+2*inte2+inte3
+
+```
+
+```{r Estimate the mean function}
+# design matrix
+N.obs = length(GE3.Y.vec)
+Xmat = matrix(0,N.obs,K_num_basis)
+start.temp = 1
+for (i in 1:NumLines){
+  n.i = length(c(0, 14, 28, 42, 63, 105))
+  Xmat[(start.temp:(start.temp+n.i-1)),] = eval.basis(time.points,basis.fnct,0)
+  start.temp = start.temp+n.i
+}
+
+### Penalized least squares estimates ###
+lam = tuning_nointera(-10,15,Omega,Xmat,GE3.Y.vec)	# tunning parameter
+# print(log(lam))
+bhat = solve(t(Xmat)%*%Xmat+adiag(Omega*lam))%*%t(Xmat)%*%GE3.Y.vec
+
+### draw a picture for the raw data with the estimated mean function ###
+# J = tmax-tmin+1
+# tt = tmin:tmax
+J = 300
+tt = seq(tlimit[1], tlimit[2], length.out=J)	# evaluation time points
+BS = eval.basis(tt,basis.fnct,0)		# evaluation of the basis functions over the evaluation time points
+mu = BS%*%bhat	# estimate mean function
+
+ggplot(Taxa.BluesbyTaxa)+geom_line(aes(x = time, y = GE3, group = taxa))+
+  geom_line(data = data.frame(time = as.vector(x = c(time.points,tt)),
+                              Mu = as.vector(c(mu.emp, mu)),
+                              EstimationMethod = c(rep('Empirical',length(time.points)),rep('Fitted',length(tt)))), 
+            aes(x = time, y = Mu, group = EstimationMethod, color = EstimationMethod), size = 2)
+
+```
+
+After fitting the mean function it is decomposed into the eigen functions. In this case 5 eigen functions come out of the decomposition, and they are plotted, both as deviations from zero, and with the mean added in. The first three eigenfunction essentially explain most of the variation in the data, while the rest of them essentially add in some noise at come points (negative variance explained).
+
+```{r finish estimating mean function}
+
+#This step takes a second:
+tempPCA_funtionsOutput = pca_fun(GE3.Y.vec, T.vec = time.vec,
+                                 Xmat, bhat, K_num_basis, NumLines,
+                                 BS, basis.fnct, Omega, Omega2,
+                                 NumObsPerLine = dim(Taxa.Blues %>% filter(taxa=='AAC_Synergy'))[1])
+
+v1 = tempPCA_funtionsOutput[[1]]
+V1 = tempPCA_funtionsOutput[[2]]
+sigma.e2.hat = tempPCA_funtionsOutput[[3]]
+
+
+# The eigen-function matrix
+Phi1 = list(NumLines)
+start_temp = 1
+for (i in unique(Taxa.BluesbyTaxa$taxa)){
+  temp.taxa = Taxa.BluesbyTaxa %>% filter(taxa == i) %>% select(time)
+  Phi1[[start_temp]] =  eval.basis(temp.taxa$time,basis.fnct,0)%*%V1
+  start_temp= start_temp+1
+}
+
+# Choose the number of PCs by PVE method
+prop = c(0.85,0.9,0.95,0.99)
+v1.trim = v1[v1>0]
+n1 = length(v1.trim)
+s1 = sum(v1.trim)
+m = length(prop)
+K.prop = rep(0,m)
+for (i in 1:m){
+  for (j in 1:n1){
+    if((sum(v1.trim[1:j])/s1)>prop[i]){
+      K.prop[i] = j
+      break}}}
+K.prop
+K.est = 2
+sum(v1.trim[1:1])/s1	
+sum(v1.trim[1:2])/s1
+sum(v1.trim[1:3])/s1
+
+### draw a picture for the eigenfunctions ###
+phi.fun = BS%*%V1
+phi.fun.df = data.frame(time = tt, phi.fun) %>% pivot_longer(cols = c('X1','X2','X3','X4','X5'))
+                                                             # names_transform = c('Phi1', 'Phi2', 'Phi3','Phi4','Phi5'))
+ggplot(phi.fun.df, aes(x = time, y = value, color = name, group = name))+geom_line()
+phi.fun.df %>%  arrange(name) %>% mutate(value = value + rep(mu,5)) %>% 
+  ggplot(aes(x = time, y = value, color = name, group = name))+geom_line()
+```
+
+PCs for each line are pulled for each eigen function and the histogram for each is shown below. Based on the histogram and the plotted eigen functions above it appears that there can be some general conclusions made. The first eigenfunction separates out the non dormant lines from the dormant for example. A correlation matrix is also shown for the PC's, the scale is not well done so be aware. These PC's themselves are actually what is used in the GWA. 
+
+```{r Prediction of PCs for each line}
+K.est = 5
+# PC_noImp = pca_score(N = N.obs,Y.vec = GE3.Y.vec, Xmat,bhat,K.est,v1,Phi1,NumLines,sigma.e2.hat,NumObsPerLine = dim(Taxa.Blues %>% filter(taxa=='AAC_Synergy'))[1])
+#This can take a while
+
+# saveRDS(PC_noImp, 'testingPC_noImp.Rdata')
+PC_noImp = readRDS('testingPC_noImp.Rdata')
+
+
+summary(PC_noImp)
+PCs_withTaxa = data.frame(taxa = unique(Taxa.BluesbyTaxa$taxa), 
+                               FPC1 = PC_noImp[,1], 
+                               FPC2 = PC_noImp[,2],
+                               FPC3 = PC_noImp[,3],
+                               FPC4 = PC_noImp[,4],
+                               FPC5 = PC_noImp[,5])
+PCs_withTaxamelt = melt(PCs_withTaxa)
+ggplot(PCs_withTaxamelt, aes(x = value))+geom_histogram()+facet_wrap(facets = vars(variable), scales = 'free')
+ggplot(melt(cor(PCs_withTaxa[,2:6])), aes(x = Var1, y = Var2, fill = value))+ geom_tile()+
+  scale_fill_continuous(high = 'red',low = 'white')+labs(title = 'Correlation between PC scores')
+```
+
+Using the appropriate combinations of eigen functions allows for the recovery of the curve that the pcs estimate. They are displayed using all five pcs, three PCs that explain ~100% of the variance, two that explain 90%, and one which explains ~65%. The bounded nature of the GE3 makes it not the best for demonstration, but one gets the idea.
+
+```{r recovery of the FPCA estimated ge3 curve for each line}
+# hist(PC_noImp_withTaxa[,c('FPC_noImp1','FPC_noImp2','FPC_noImp3')])
+#Now try to use the phi functions values and the PC's to pull out the estimated GE3 curves for each line:
+# The mean function is output is mu and the times it was evaluated at are tt
+# REcovering the GE3 curves for each line should be as simple as mu + sum(eigenfunction*PCscore) at each time in tt
+timeMuPhiEval = data.frame(time = tt, mu = mu, Phi1 = phi.fun[,1], 
+                           Phi2 = phi.fun[,2], Phi3 = phi.fun[,3],
+                           Phi4 = phi.fun[,4], Phi5 = phi.fun[,5])
+GE3Recovery = data.frame()
+for (i in unique(PCs_withTaxa$taxa)){
+  temp.df = PCs_withTaxa %>% filter(taxa == i)
+  GE3Estimate5PC = timeMuPhiEval$mu+ as.matrix(phi.fun) %*% t(as.matrix(temp.df[c('FPC1','FPC2','FPC3','FPC4','FPC5')]))
+
+  GE3Estimate3PC = timeMuPhiEval$mu+as.matrix(phi.fun[,1:3]) %*% t(as.matrix(temp.df[c('FPC1','FPC2','FPC3')]))
+  
+  GE3Estimate2PC = timeMuPhiEval$mu+as.matrix(phi.fun[,1:2]) %*% t(as.matrix(temp.df[c('FPC1','FPC2')]))
+
+  GE3Estimate1PC = timeMuPhiEval$mu+
+    timeMuPhiEval$Phi1*temp.df$FPC1
+
+    GE3Recovery = rbind(GE3Recovery,
+                        data.frame(taxa = i,time = tt,
+                                   GE3Estimate1PC = GE3Estimate1PC,
+                                   GE3Estimate2PC = GE3Estimate2PC,
+                                   GE3Estimate3PC = GE3Estimate3PC,
+                                   GE3Estimate5PC = GE3Estimate5PC))
+}
+
+GE3Recovery %>% pivot_longer(starts_with('GE')) %>%
+  ggplot(aes(x = time, y = value, group = taxa))+geom_line()+facet_wrap(facets = vars(name))+
+  geom_hline(yintercept = c(0,1), color = 'red')
+```
+
+## Proof of Function:
+<details>
+  <summary>Click to Expand</summary>
+
+
+All of these steps I have combined within one function `FPCA_function`, lets validate it here with the same input data, number of knots, and order of functions. The correlation between the FPC's is one and so it works!
+
+```{r}
+# Testing_FPCAFucntion = FPCA_function(dfTaxaTraitTime = Taxa.BluesbyTaxa[,c('taxa','time','GE3')],
+#                          Trait = 'GE3', #Trait name must be entered as a character ie Trait = 'GE3'
+#                          NumKnots = 2, # NumKnots is the number of interior knots to be fitted
+#                          order = 3, # Order is the dergree of the polynomial to be fit to the data.
+#                          NumObsevationsPerLine = 6)
+# 
+# 
+# saveRDS(Testing_FPCAFucntion, 'Testing_FPCAFucntion.Rdata')
+Testing_FPCAFucntion = readRDS('Testing_FPCAFucntion.Rdata')
+# They are the SAME!
+print('Correlations:')
+cor(Testing_FPCAFucntion$PCs_withTaxa$FPC1, PCs_withTaxa$FPC1)
+cor(Testing_FPCAFucntion$PCs_withTaxa$FPC2, PCs_withTaxa$FPC2)
+
+```
