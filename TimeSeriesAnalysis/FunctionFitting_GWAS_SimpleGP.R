@@ -935,572 +935,14 @@ setwd(rprojroot::find_rstudio_root_file())
 # save(FiltGI3LogisticFits1920.GWAS.S, file = 'FiltGI3LogisticFits1920.GWAS.S.RData')
 # setwd(rprojroot::find_rstudio_root_file())
 
-################################
-# setwd('GWAS_OUTPUTS/')
-# load("GE31920PerTP.GWAS.S.RData")
-# load("GE3FPCA1920.GWAS.S.RData")
-# load("GE3LogisticFits1920.GWAS.S.RData")
-# load("GI31920PerTP.GWAS.S.RData")
-# load("GI3FPCA1920.GWAS.S.RData")
-# load("GI3LogisticFits1920.GWAS.S.RData")
-# setwd(rprojroot::find_rstudio_root_file())
-
-### PLOTS: This script creates almost all plots in the paper, saving them can be done by ####
-# changing the workdir and uncommenting things ###### 
-### GE Recovered curve plots for FPCA and Logistic, and parameters histograms #########
-GElogPcounts = GE3_3P_logFits.W %>% 
-  pivot_longer(cols = 2:8) %>% filter(!is.na(value))%>% group_by(name) %>% 
-  summarise(n = n()) %>% mutate(FacetLabel = paste0(name,': n=', n)) %>%
-  merge(.,GE3_3P_logFits.W %>% pivot_longer(cols = 2:8),by = 'name') %>%
-  mutate(ModelType = 'Logistic',
-         ParamFiltered = taxa %in% (GE3_3P_logFits.W %>% filter(Lower>0.8))$taxa)
-GEfpcaPcounts = GE31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
-  mutate(FacetLabel = paste0(name,': n=', n)) %>% merge(.,GE31920FPCA.ouputs.longer, by ='name') %>% mutate(ModelType = 'FPCA')
-
-GEfpcaRecoveredCurves = GE31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GE31920.FPCA$phi.fun.df$time) %>%
-  pivot_longer(cols = 1:484, values_to = 'GE3', names_to = 'taxa') %>% select(taxa,time,GE3) %>% 
-  mutate(ModelType = 'FPCA fits') %>% 
-  ggplot(aes(x = time, y = GE3, group = taxa))+geom_line(color ='darkgrey')+
-  facet_grid(cols = vars(ModelType))+
-  geom_point(data = All.BluesGE31920%>% filter(taxa %nin% GE3logTaxatoFilter$taxa), color ='blue', size =.9)+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GE')
-
-GElogisticRecoveredCurves = GE3fittedCurves %>% 
-  filter(taxa %nin% GE3logTaxatoFilter$taxa) %>% 
-  mutate(ModelType = 'Logistic fits',
-         ParamFiltered = taxa %in% (GE3_3P_logFits.W %>% filter(Lower>0.8))$taxa) %>%
-  ggplot(aes(x = time, y = GE3estimate, group = taxa))+geom_line(color = 'darkgrey')+
-  facet_grid(cols = vars(ModelType)) +
-  geom_point(data = All.BluesGE31920%>% filter(taxa %nin% GE3logTaxatoFilter$taxa),inherit.aes = F, 
-             aes(x = time, y = GE3), color ='blue', size =.9)+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GE')
-  
-GECurveandParamPlot = GEfpcaRecoveredCurves+ 
-  ggplot(GEfpcaPcounts %>%
-           mutate(FacetLabel= mapvalues(FacetLabel, from = c('TimeTo90: n=484','TimeTo95: n=484'),to = c('fTimeTo90: n=484','fTimeTo95: n=484'))),
-         aes(x = value))+geom_histogram()+facet_wrap(vars(FacetLabel),scales = 'free')+theme_bw(base_size = 8)+
-  labs(subtitle = 'FPCA FPCs and derived values')+
-  GElogisticRecoveredCurves+
-  ggplot(GElogPcounts,aes(x = value))+geom_histogram()+
-  facet_wrap(vars(FacetLabel), scales = 'free')+
-  theme_bw(base_size = 8)+theme(legend.position = 'none')+
-  labs(subtitle = 'Logistic parameter and derived values')+
-  plot_layout(design = c('AABBB \n CCDDD'), heights = c(2,3))+
-  plot_annotation(tag_levels = 'a') & 
-  theme(plot.tag.position = c(0, 1),
-        plot.tag = element_text(size = 8, hjust = 0, vjust = 0))
-GECurveandParamPlot
-setwd(rprojroot::find_rstudio_root_file())
-# setwd('SpringBarley/Analysis/All_taxa/FinalOutputsJPEG/')
-# jpeg('GECurvenadParameters.jpg', 800,600, res = 120)
-GECurveandParamPlot
-# dev.off()
-
-### GI recovered curves and parameters plotted for FPCA and logistic curves #######
-GIlogPcounts = GI3_4P_logFits.w %>% select(!c(TimeTo5.6)) %>%
-  mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>%
-  pivot_longer(cols = 2:9) %>% group_by(name)%>%
-  filter(!is.na(value)) %>% summarise(n = n())%>% mutate(FacetLabel = paste0(name,': n=', n)) %>% 
-  merge(.,GI3_4P_logFits.w %>% select(!c(TimeTo5.6)) %>%
-          mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>% pivot_longer(cols = 2:9),
-        by = 'name')
-GIfpcaPcounts = GI31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
-  mutate(FacetLabel= mapvalues(paste0(name,': n=', n), from = c('TimeTo5.0: n=478','TimeTo5.6: n=398'),
-                               to = c('fTimeTo5.0: n=478','fTimeTo5.6: n=398'))) %>% 
-  merge(.,GI31920FPCA.ouputs.longer, by ='name') %>% 
-  mutate(ModelType = 'FPCA')
-
-GIfpcaRecoveredCurves = GI31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GI31920.FPCA$phi.fun.df$time) %>%
-  pivot_longer(cols = 1:484, values_to = 'GI3', names_to = 'taxa') %>%
-  select(taxa,time,GI3) %>% mutate(ModelType = 'FPCA fits') %>% 
-  ggplot(aes(x = time, y = GI3, group = taxa))+geom_line(color ='darkgrey')+
-  facet_grid(cols = vars(ModelType))+
-  geom_point(data = all1920GIBlues %>% filter(taxa %nin% GI3logTaxatoFilter$taxa), color ='blue', size = 0.9)+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GI')
-
-GIlogisticRecoveredCurves = GI3fittedCurves %>% filter(taxa %nin% GI3logTaxatoFilter$taxa) %>% 
-  mutate(ModelType = 'Logistic fits') %>%
-  ggplot(aes(x = time, y = GI3estimate, group = taxa))+geom_line(color ='darkgrey')+
-  facet_grid(cols = vars(ModelType)) +
-  geom_point(data = all1920GIBlues%>% filter(taxa %nin% GI3logTaxatoFilter$taxa),
-             inherit.aes = F, aes(x = time, y = GI3), color ='blue', size = 0.9)+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GI')
-
-GICurveandParamPlot = 
-  GIfpcaRecoveredCurves+ 
-  ggplot(GIfpcaPcounts,aes(x = value))+geom_histogram()+facet_wrap(vars(FacetLabel),scales = 'free')+theme_bw(base_size = 8)+
-  labs(subtitle = 'FPCA FPCs and derived values')+
-  GIlogisticRecoveredCurves+
-  ggplot(GIlogPcounts,aes(x = value))+geom_histogram()+facet_wrap(vars(FacetLabel), scales = 'free')+theme_bw(base_size = 8)+
-  labs(subtitle = 'Logistic parameter and derived values')+
-  plot_layout(design = c('AABBB \n CCDDD'), heights = c(2,3))+
-  plot_annotation(tag_levels = 'a') & 
-  theme(plot.tag.position = c(0, 1),
-        plot.tag = element_text(size = 8, hjust = 0, vjust = 0))
-
-GICurveandParamPlot
-# setwd(rprojroot::find_rstudio_root_file())
-# setwd('SpringBarley/Analysis/All_taxa/FinalOutputsJPEG/')
-# jpeg('GICurvenadParameters.jpg', 800,600, res = 120)
-# GICurveandParamPlot
-# dev.off()
-
-### GI Functional Manhattan #####
-GIfunctionalModelingManhattan = rbind(GI3FPCATopMarkers,
-                                      GI3LogisticTopMarkers,
-                                      filtGI3LogisticTopMarkers) %>%  filter(maf >0.07) %>%
-  mutate(ModelTypeParam = paste0(ModelType,trait),
-         ModelType = mapvalues(ModelType, from = c('GI3Logistic','GI3FPCA','FiltGI3Logistic' ), 
-                               to=c('Logistic','FPCA', 'Filtered Logistic'))) %>%
-  mutate(trait = factor(trait, levels = c('FPC1','FPC2','FPC3','TimeTo5.0','TimeTo5.6','Centering',
-                                          'Lower','Rate','Upper','DeltaGI','DeltaGI90','DeltaGI95'))) %>%
-  ggplot(aes(x = ordinal, y = log10PVal, shape = ModelType))+
-  geom_point(aes(color = trait), size =2.5) +
-  geom_vline(xintercept = ChromLines)+
-  geom_vline(xintercept = c(9228,10771), color = 'red')+
-  annotate(geom = 'text', x = 9228, y = 22, label = 'AlaAt')+
-  annotate(geom = 'text', x = 10771, y = 18, label = 'MKK3')+
-  scale_x_continuous(label = c("1H","2H", "3H", "4H", "5H", "6H", "7H", "UN"),
-                     breaks = breaks)+
-  ylab('-log(p-value)')+xlab('Chromosome')+
-  geom_hline(yintercept = -log10(5e-5))+
-  ylim(0,30)+
-  theme_bw()+labs(shape = 'Time series\nmodel',color = 'Parameter') +
-  guides(color = guide_legend(order=2),
-         shape = guide_legend(order=1))
-
-# jpeg('GIfunctionalModelingManhattan.jpg', 800,600, res = 120)
-# GIfunctionalModelingManhattan
-# dev.off()
-
-### GE Functional Manhattan Plot #####
-
-GEfunctionalModelingManhattan = rbind(GE3FPCATopMarkers,GE3LogisticTopMarkers,
-                                      filtGE3LogisticTopMarkers) %>%  filter(maf >0.07) %>%
-  mutate(ModelTypeParam = paste0(ModelType,trait),
-         ModelType = mapvalues(ModelType, from = c('GE3Logistic','GE3FPCA','FiltGE3Logistic'),
-                               to=c('Logistic','FPCA','Filtered Logistic'))) %>%
-  mutate(trait = factor(trait, levels = c('FPC1','FPC2','FPC3','TimeTo90','TimeTo95','Centering',
-                                          'Lower','Rate','rTimeTo90','rTimeTo95'))) %>%
-  ggplot(aes(x = ordinal, y = log10PVal, shape = ModelType))+
-  geom_point(aes(color = trait), size =2.5) +
-  geom_vline(xintercept = ChromLines)+
-  geom_vline(xintercept = c(9228,10771), color = 'red')+
-  annotate(geom = 'text', x = 9228, y = 22, label = 'AlaAt')+
-  annotate(geom = 'text', x = 10771, y = 18, label = 'MKK3')+
-  scale_x_continuous(label = c("1H","2H", "3H", "4H", "5H", "6H", "7H", "UN"),
-                     breaks = breaks)+
-  ylab('-log(p-value)')+xlab('Chromosome')+
-  geom_hline(yintercept = -log10(5e-5))+
-  ylim(0,30)+
-  theme_bw()+labs(shape = 'Time series\nmodel',color = 'Parameter') +
-  guides(color = guide_legend(order=2),
-         shape = guide_legend(order=1))
-
-# jpeg('GEfunctionalModelingManhattan.jpg', 800,550, res = 120)
-# GEfunctionalModelingManhattan
-# dev.off()
-
-
-### per time point Manhattan plot #####
-# jpeg('perTPModeling.jpg', 800,400, res = 120)
-rbind(GI3perTPTopMarkers,GE3perTPTopMarkers) %>%
-  mutate(ModelType = mapvalues(ModelType, from = c('GE3 per Time Point','GI3 per Time Point'),
-                               to =c('GE','GI') )) %>%
-  filter(maf >0.07) %>%
-  mutate(ModelTypeParam = paste0(ModelType,trait),
-         trait = substr(trait,1,3)) %>%
-  ggplot(aes(x = ordinal, y = log10PVal, shape = ModelType))+
-  geom_point(aes(color = trait), size =2.5) +
-  geom_vline(xintercept = ChromLines)+
-  geom_vline(xintercept = c(9228,10771), color = 'red')+
-  annotate(geom = 'text', x = 9228, y = 22, label = 'AlaAt')+
-  annotate(geom = 'text', x = 10771, y = 18, label = 'MKK3')+
-  scale_x_continuous(label = c("1H","2H", "3H", "4H", "5H", "6H", "7H", "UN"),
-                     breaks = breaks)+
-  ylab('-log(p-value)')+xlab('Chromosome')+
-  geom_hline(yintercept = -log10(5e-5))+
-  ylim(0,30)+
-  theme_bw()+labs(color = 'Time point',shape = 'Trait')+
-  guides(color = guide_legend(order=2),
-         shape = guide_legend(order=1))
-
-# dev.off()
-
-### significant per TP and Functional Markers for the tables ######
-# per TP
-rbind(GI3perTPTopMarkers,GE3perTPTopMarkers) %>%  filter(maf > 0.07 &P.value<5e-5) %>% 
-  mutate(log10PVal = round(log10PVal,2)) %>%
-  select(ModelType,trait, SNP,Chromosome, Position,maf, log10PVal) 
-
-#for functional analysis
-SigMarkers = rbind(GI3FPCATopMarkers, 
-                   GE3FPCATopMarkers,
-                   GI3LogisticTopMarkers,
-                   GE3LogisticTopMarkers,
-                   filtGE3LogisticTopMarkers,
-                   filtGI3LogisticTopMarkers) %>%  filter(maf >0.07 & P.value < 5e-5) %>%
-  arrange(Chromosome, Position)
-View(SigMarkers %>% select(ModelType,trait,SNP, Chromosome, Position,maf, P.value))
-SigMarkers %>%
-  arrange(ModelType, trait, Chromosome, Position, P.value) %>%
-  mutate(log10PVal = round(log10PVal,2)) %>%
-  select(ModelType,trait, SNP,Chromosome, Position, maf, log10PVal)%>%
-  merge(., rbind(
-    GE3_3P_logFits.W %>% 
-      pivot_longer(cols = 2:8) %>% filter(!is.na(value))%>% group_by(name) %>% 
-      summarise(n = n()) %>%  mutate(ModelType = 'GE3Logistic') %>% rename(trait = name),
-    GE3_3P_logFits.W %>% filter(Lower<0.8) %>%
-      pivot_longer(cols = 2:8) %>% filter(!is.na(value))%>% group_by(name) %>% 
-      summarise(n = n()) %>%  mutate(ModelType = 'FiltGE3Logistic') %>% rename(trait = name),
-    GE31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
-      mutate(ModelType = 'GE3FPCA') %>% rename(trait = name),
-    GI3_4P_logFits.w %>% 
-      mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>%
-      pivot_longer(cols = 2:10) %>% group_by(name)%>%
-      filter(!is.na(value)) %>% summarise(n = n())%>%mutate(ModelType = 'GI3Logistic') %>% 
-      rename(trait = name),
-    GI3_4P_logFits.w %>% filter(Lower<5.0) %>%  
-      mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>%
-      pivot_longer(cols = 2:10) %>% group_by(name)%>%
-      filter(!is.na(value)) %>% summarise(n = n())%>% mutate(ModelType = 'FiltGI3Logistic') %>% 
-      rename(trait = name),
-    GI31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
-      rename(trait = name) %>% mutate(ModelType = 'GI3FPCA')), by = c('ModelType','trait'),all.X =TRUE)%>%
-  mutate(ModelType = mapvalues(ModelType, 
-                               from=c("GI3Logistic","GI3FPCA","GE3Logistic","FiltGE3Logistic","FiltGI3Logistic","GE3FPCA"),
-                               to=c("GILogistic","GIFPCA","GELogistic","GELogisticFilt","GILogisticFilt","GEFPCA")))%>%
-  rename(Chr = Chromosome, Trait = trait, '-log(p-value)' = log10PVal) %>%
-  mutate('Marker Region' = ifelse(Chr==5 & Position>585246000 & Position < 600000000, 'SD2',
-                                  ifelse(Chr==5 &Position >442000000 & Position <443000000,'SD1',NA)),
-         'Gene Candidate' = mapvalues(`Marker Region`, from = c('SD1','SD2'), to = c('HvAlaAT1','HvMKK3'))) %>%
-  tail(.,17)
-
-uniqueMarkers = SigMarkers %>% select(SNP) %>% mutate(SNP = as.character(SNP)) %>% unique()
-ModelList = c(rep("GIFPCA",5),
-              rep("GEFPCA",5),
-              rep("GILogistic",8),
-              rep("GELogistic",7),
-              rep("GELogisticFilt",7),
-              rep("GILogisticFilt",8))
-TraitList = c(GI3FPCA1920.GWAS.S.traits,GE3FPCA1920.GWAS.S.traits,GI3LogisticFits1920.GWAS.S.Traits,
-              GE3LogisticFits1920.GWAS.S.Traits,filtGE3LogisticFits1920.GWAS.S.Traits,filtGI3LogisticFits1920.GWAS.S.Traits)
-AllPvals = data.frame()
-Countout = 1
-counter = 1
-for (i in c(GI3FPCA1920.GWAS.S,GE3FPCA1920.GWAS.S,GI3LogisticFits1920.GWAS.S,GE3LogisticFits1920.GWAS.S,
-            FiltGE3LogisticFits1920.GWAS.S,FiltGI3LogisticFits1920.GWAS.S)){
- print(head(i))
-    AllPvals = rbind(i %>% mutate(SNP = as.character(SNP))%>% filter(SNP %in% uniqueMarkers$SNP) %>% 
-            select(SNP,Chromosome, Position,maf, log10PVal) %>%
-            mutate(ModelType =ModelList[counter],
-                   Trait = TraitList[counter])
-          ,AllPvals)
-  counter =counter+1  
-}
-AllPvals %>% colnames()
-AllPvals %>%select(!maf)%>%pivot_wider(names_from = c(ModelType,Trait), names_sep = '_', values_from = log10PVal)
-  
-  
-### GE Logistic Parameters correlations and colored by MKK3 status #########
-# setwd(rprojroot::find_rstudio_root_file())
-# setwd('SpringBarley/Analysis/All_taxa/FinalOutputsJPEG/')
-# jpeg(filename = 'GELogParamsScaterplot.jpg',700,500,res= 120 )
-merge(GE3_3P_logFits.W%>%select(taxa, Lower,Rate, Centering) %>%
-        pivot_longer(.,names_to = 'Xnames',values_to = 'Xvalues', cols = c(Lower,Rate,Centering)),
-      GE3_3P_logFits.W%>%select(taxa, Lower,Rate, Centering), by = 'taxa')%>%
-  pivot_longer(.,names_to = 'Ynames',values_to = 'Yvalues', cols = c(Lower,Rate,Centering)) %>%
-  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342')], by = 'taxa',all.x = TRUE) %>% 
-  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
-  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
-         MKK3_E165Q = paste(MKK3_E165Q),
-         SD2Code= mapvalues(SD2, from = c('00','20','22'), 
-                            to = c('D','ND','VND'))) %>%
-  ggplot(aes(x = Xvalues, y = Yvalues, color = SD2Code))+geom_point()+
-  facet_grid(rows = vars(Ynames), cols = vars(Xnames), scales = 'free')+theme_bw() +
-  scale_colour_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name = "*HvMKK3* \nallele", 
-                      labels = expression(MKK3[D],MKK3[N],MKK3[N^{"*"}]))+
-  theme(legend.title = element_markdown())+
-  xlab('Values')+ylab('Values')
-# dev.off()
-
-
-### GI Logistic parameters Correlations and colored by MKK3 Status ######
-
-# jpeg(filename = 'GILogParamsScaterplot.jpg',700,500,res= 120 )
-merge(GI3_4P_logFits.w%>%select(taxa, Lower,Rate, Centering, Upper) %>%
-        pivot_longer(.,names_to = 'Xnames',values_to = 'Xvalues', cols = c(Lower,Rate,Centering,Upper)),
-      GI3_4P_logFits.w%>%select(taxa, Lower,Rate, Centering, Upper), by = 'taxa')%>%
-  pivot_longer(.,names_to = 'Ynames',values_to = 'Yvalues', cols = c(Lower,Rate,Centering,Upper)) %>%
-  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342')], by = 'taxa',all.x = TRUE) %>% 
-  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
-  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
-         MKK3_E165Q = paste(MKK3_E165Q),
-         SD2Code= mapvalues(SD2, from = c('00','20','22'), to= c('Dormant','Non-Dormant','Very \n Non-Dormant'))) %>%
-  ggplot(aes(x = Xvalues, y = Yvalues, color = SD2Code))+geom_point()+
-  facet_grid(rows = vars(Ynames), cols = vars(Xnames), scales = 'free')+theme_bw() +
-  scale_colour_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name = "*HvMKK3* \nallele", 
-                      labels = expression(MKK3[D],MKK3[N],MKK3[N^{"*"}]))+
-  theme(legend.title = element_markdown())+
-  xlab('Values')+ylab('Values')
-# dev.off()
-
-### GE FPCA models FPC effects coloring ####
-# jpeg(filename = 'GEFPCscolored.jpg', 700,350, res = 120)
-GE31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GE31920.FPCA$phi.fun.df$time) %>%
-  pivot_longer(cols = 1:484, values_to = 'GE3', names_to = 'taxa') %>%
-  select(taxa,time,GE3) %>% mutate(ModelType = 'FPC1') %>% 
-  merge(GE31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
-  ggplot(aes(x = time, y = GE3, group = taxa))+geom_line(aes(color = FPC1))+
-  facet_grid(cols = vars(ModelType))+
-  # labs(subtitle = 'FPCA fits')+
-  # geom_point(data = All.BluesGE31920%>% filter(taxa %nin% GE3logTaxatoFilter$taxa), color ='blue', size =.9)+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GE') +
-GE31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GE31920.FPCA$phi.fun.df$time) %>%
-  pivot_longer(cols = 1:484, values_to = 'GE3', names_to = 'taxa') %>%
-  select(taxa,time,GE3) %>% mutate(ModelType = 'FPC2') %>% 
-  merge(GE31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
-  ggplot(aes(x = time, y = GE3, group = taxa))+geom_line(aes(color = FPC2))+
-  facet_grid(cols = vars(ModelType))+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GE')
-# dev.off()
-
-### GI FPCA models FPC effects coloring #####
-# jpeg(filename = 'GIFPCscolored.jpg', 700,350, res = 120)
-GI31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GI31920.FPCA$phi.fun.df$time) %>%
-  pivot_longer(cols = 1:484, values_to = 'GI3', names_to = 'taxa') %>%
-  select(taxa,time,GI3) %>% mutate(ModelType = 'FPC1') %>% 
-  merge(GI31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
-  ggplot(aes(x = time, y = GI3, group = taxa))+geom_line(aes(color = FPC1))+
-  facet_grid(cols = vars(ModelType))+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GI') +
-  GI31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GI31920.FPCA$phi.fun.df$time) %>%
-  pivot_longer(cols = 1:484, values_to = 'GI3', names_to = 'taxa') %>%
-  select(taxa,time,GI3) %>% mutate(ModelType = 'FPC2') %>% 
-  merge(GI31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
-  ggplot(aes(x = time, y = GI3, group = taxa))+geom_line(aes(color = FPC2))+
-  facet_grid(cols = vars(ModelType))+
-  theme_bw(base_size = 8) +xlab('Time')+ylab('GI')
-# dev.off()
-
-### Time to 95 and 90 GE logistic models png histograms KS tests  ######
-testing = data.frame(taxa = myGD20_prune$taxa,
-                     Chr6mk = paste0(round(myGD20_prune$`JHI-Hv50k-2016-408912`,0)),
-                     SDHaplo = paste0(round(myGD20_prune$AlaAT_L214F,0),
-                                      round(myGD20_prune$`JHI-Hv50k-2016-367342`,0),
-                                      myGD20_prune$MKK3_E165Q)) %>%
-  merge(VectorofTimeto95[c('taxa','TimeTo95')], by = 'taxa',all = TRUE) %>% rename(fTimeTo95 = TimeTo95) %>%
-  merge(GE3_3P_logFits.W[c('taxa','TimeTo95')],by ='taxa', all = TRUE) %>%
-  merge(VectorofTimeto90[c('taxa','TimeTo90')], by = 'taxa',all = TRUE) %>% rename(fTimeTo90 = TimeTo90) %>%
-  merge(GE3_3P_logFits.W[c('taxa','TimeTo90')],by ='taxa', all = TRUE)
-cor(as.numeric(testing$Chr6mk), testing$TimeTo90, use = 'complete.obs')
-testing %>% select(TimeTo90, fTimeTo90, TimeTo95, fTimeTo95) %>% 
-  pairs(.,lower.panel = upper.panel,upper.panel = panel.cor)
-
-timetoDormbreaksum = testing %>% 
-  pivot_longer(cols =c(TimeTo90, fTimeTo90, TimeTo95, fTimeTo95)) %>%
-  group_by(name) %>%  filter(!is.na(value)) %>%
-  summarize(Mean = mean(value),
-            '  0th Percentile' = quantile(value)[1],
-            ' 25th Percentile' = quantile(value)[2],
-            ' 50th Percentile, \n Median' = quantile(value)[3],
-            ' 75th Percentile' = quantile(value)[4],
-            '100th Percentile' = range(value)[2]) %>% 
-  pivot_longer(cols = !name, names_to = 'Statistic') %>%
-  mutate(linetype = ifelse(Statistic == 'Mean','solid','dashed'))
-
-# jpeg('TimeToDormancyBreakHist.jpg', 700,500, res = 120)
-testing %>%  pivot_longer(cols =c(TimeTo90, fTimeTo90, TimeTo95, fTimeTo95)) %>% 
-  filter(value<100) %>%
-  ggplot(aes(x= value)) +facet_wrap(vars(name))+geom_histogram()+
-  geom_vline(data = timetoDormbreaksum,
-             aes(xintercept = value, color = Statistic, linetype =linetype), size = 1.6) +
-  xlim(0, 100) + guides(linetype = FALSE) + theme_bw() +xlab('Estimated time to threshold')
-# dev.off()
-
-ks.test(x = testing$TimeTo90, y = testing$fTimeTo90, alternative = c('two.sided')) 
-ks.test(x = testing$TimeTo95, y = testing$fTimeTo95, alternative = c('two.sided')) 
-t.test(x = testing$TimeTo90, y = testing$fTimeTo90, alternative = c('two.sided')) 
-t.test(x = testing$TimeTo95, y = testing$fTimeTo95, alternative = c('two.sided')) 
-
-
-
-### Time To thresholds vs PHS and other things ######
-
-gatherpairs <- function(data, ..., 
-                        xkey = '.xkey', xvalue = '.xvalue',
-                        ykey = '.ykey', yvalue = '.yvalue',
-                        na.rm = FALSE, convert = FALSE, factor_key = FALSE) {
-  vars <- quos(...)
-  xkey <- enquo(xkey)
-  xvalue <- enquo(xvalue)
-  ykey <- enquo(ykey)
-  yvalue <- enquo(yvalue)
-  
-  data %>% {
-    cbind(gather(., key = !!xkey, value = !!xvalue, !!!vars,
-                 na.rm = na.rm, convert = convert, factor_key = factor_key),
-          select(., !!!vars)) 
-  } %>% gather(., key = !!ykey, value = !!yvalue, !!!vars,
-               na.rm = na.rm, convert = convert, factor_key = factor_key)
-}
-
-# setwd(rprojroot::find_rstudio_root_file())
-load("SpringBarley/PhenotypeData/ProcessedData/PHS_BLUEs_GGS1920.RData")
-# setwd('SpringBarley/Analysis/All_taxa/FinalOutputsJPEG/')
-
-PopulationKey = read.csv(file = 'SpringBarley/GenotypeData/PopulationKey.csv') %>% select(!X)
-CULines =PopulationKey %>% filter(Population %in% c("check","C1G","C2G","C1P","base"))
-
-#Correlations for only the Cu lines
-PHSftimeCors = (PHS.blues %>% merge(.,
-                                   All.BluesGE31920 %>% select(TP, taxa, GE3)%>%filter(TP =='TP1'),
-                                   by = 'taxa')%>%
-  merge(.,
-        all1920GIBlues %>% select(TP, taxa, GI3)%>%filter(TP =='TP1')) %>%
-  rename('GE TP1' =GE3, 'GI TP1' = GI3) %>%
-  merge(.,VectorofTimeto95[c('taxa',"TimeTo95")], by = 'taxa') %>%
-  merge(.,VectorofTimeto5.0[c('taxa','TimeTo5.0')], by = 'taxa') %>%
-  rename(fTimeTo95 = TimeTo95, fTimeTo5.0 = TimeTo5.0) %>%
-  filter(taxa %in%CULines$taxa) %>%
-  select(!c(taxa,TP)) %>% cor(., use='complete.obs'))
-
-phscors = matrix(NA,nrow =5, ncol = 5)
-phscors[lower.tri(phscors, diag=FALSE)] <- PHSftimeCors[lower.tri(PHSftimeCors, diag = F)]
-colnames(phscors) = colnames(PHSftimeCors); rownames(phscors)=rownames(PHSftimeCors)
-phscors = data.frame(phscors) %>% add_rownames() %>% pivot_longer(cols = !rowname) %>% filter(value != 0)
-
-#PHS with ftimeto5.0 and ftimeto95 in ONLY THE CU LINES
-# jpeg('PHSwithOtherTraits.jpg', 1000,600, res = 120)
-PHS.blues %>% merge(.,
-                    all_BLUE %>% select(TP, taxa, GE3,GI3scale)%>%filter(TP =='TP1'),
-                    by = 'taxa')%>%
-  rename('GE TP1' =GE3, 'GI TP1' = GI3scale) %>%
-  merge(.,VectorofTimeto95[c('taxa',"TimeTo95")], by = 'taxa') %>%
-  merge(.,VectorofTimeto5.0[c('taxa','TimeTo5.0')], by = 'taxa') %>%
-  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342', 'AlaAT_L214F')], by = 'taxa',all.x = TRUE) %>% 
-  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>% 
-  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
-         AlaAT = round(AlaAT_L214F),
-         AlaATcode = mapvalues(AlaAT,from =c(0,2,1), to = c('N','D','Het')),
-         MKK3_E165Q = paste(MKK3_E165Q),
-         SD2Code= mapvalues(SD2, from = c('00','20','22'), to= c('Dormant','Non-Dormant','Very \n Non-Dormant'))) %>% 
-  rename(fTimeTo95 = TimeTo95, fTimeTo5.0 = TimeTo5.0) %>%
-  filter(taxa %in% CULines$taxa) %>%
-  gatherpairs(PHS, 'GE TP1', 'GI TP1',fTimeTo95,fTimeTo5.0) %>%
-  ggplot(aes(x = .xvalue, y = .yvalue, color = SD2Code))+
-  geom_point()+
-  scale_colour_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name = "*HvMKK3* \nallele", 
-                      labels = expression(MKK3[D],MKK3[N],MKK3[N^{"*"}]))+theme_bw() +
-  theme(legend.title = element_markdown())+
-  facet_grid(cols = vars(.xkey), rows = vars(.ykey), scales = 'free',switch = "y")+
-  xlab('Values')+ylab('Values')
-# dev.off()
-
-#Correlations for all the CU and the JIC
-PHS.blues %>% merge(.,
-                    All.BluesGE31920 %>% select(TP, taxa, GE3)%>%filter(TP =='TP1'),
-                    by = 'taxa')%>%
-  merge(.,
-        all1920GIBlues %>% select(TP, taxa, GI3)%>%filter(TP =='TP1')) %>%
-  rename(GE_PM6 =GE3, GI_PM6 = GI3) %>%
-  merge(.,VectorofTimeto95[c('taxa',"TimeTo95")], by = 'taxa') %>%
-  merge(.,VectorofTimeto5.0[c('taxa','TimeTo5.0')], by = 'taxa') %>%
-  select(!c(taxa,TP)) %>% cor(., use='complete.obs')
-
-### Some examples of poor GI fits #####
-# jpeg('PoorGILogFits.jpg', 500,400, res = 120)
-GI3fittedCurves %>% filter(taxa %nin% GI3logTaxatoFilter$taxa) %>% 
-  mutate(ModelType = 'Logistic fits with rate < -10') %>% filter(taxa %in% (GI3_4P_logFits.w %>% filter(Rate < -10))$taxa)%>%
-  ggplot(aes(x = time, y = GI3estimate, group = taxa, color = taxa))+geom_line(size = 1.5)+
-  facet_grid(cols = vars(ModelType)) +
-  geom_point(data = all1920GIBlues%>% filter(taxa %nin% GI3logTaxatoFilter$taxa)%>% 
-               filter(taxa %in% (GI3_4P_logFits.w %>% filter(Rate < -10))$taxa),
-             inherit.aes = F, aes(x = time, y = GI3,color = taxa), size = 1.5)+
-  theme_bw(base_size = 10 ) +xlab('Time')+ylab('GI') +labs(color = 'Line')
-# dev.off()
-### Distributions of fTimeto5.0 vs TimeTo5.0
-# jpeg('TimeTo5thresholdsfpcavslogsitic.jpg', 500,400, res = 120)
-join(VectorofTimeto5.0 %>% select(taxa, TimeTo5.0) %>% rename(fTimeTo5.0 = TimeTo5.0),
-    GI3_4P_logFits %>% filter(term == 'TimeTo5.0') %>% select(taxa, estimate) %>%
-      filter(estimate<250) %>%
-      rename(TimeTo5.0 = estimate)) %>%
-  pivot_longer(cols = !taxa) %>%
-  ggplot(aes(x = value))+geom_histogram()+
-  facet_wrap(vars(name), ncol = 1)+
-  geom_vline(data = join(VectorofTimeto5.0 %>% select(taxa, TimeTo5.0) %>% rename(fTimeTo5.0 = TimeTo5.0),
-                         GI3_4P_logFits %>% filter(term == 'TimeTo5.0') %>% select(taxa, estimate) %>%
-                           filter(estimate<250) %>%
-                           rename(TimeTo5.0 = estimate)) %>%  
-               pivot_longer(cols = !taxa)%>% filter(!is.na(value)) %>%
-               group_by(name) %>% 
-               summarize(Mean = mean(value),
-                         '  0th Percentile' = quantile(value)[1],
-                         ' 25th Percentile' = quantile(value)[2],
-                         ' 50th Percentile;\nMedian' = quantile(value)[3],
-                         ' 75th Percentile' = quantile(value)[4]) %>%
-               pivot_longer(cols = !name, names_to = 'Statistic') %>%
-               mutate(linetype = ifelse(Statistic == 'Mean','solid','dashed')),
-             aes(xintercept = value, color = Statistic), size = 1.6)+
-  xlab('Time to threshold') +theme_bw()
-# dev.off()
-
-### LD between things.  #############
-myGM20_prune %>% filter(Chromosome==6 & Position>472000000 & Position<474000000)
-ld = myGD20_prune %>% select(AlaAT_L214F,MKK3_E165Q, `JHI-Hv50k-2016-367342`,`JHI-Hv50k-2016-408912`,
-                        `JHI-Hv50k-2016-408918`,`JHI-Hv50k-2016-408820`,
-                        `JHI-Hv50k-2016-408472`)
-markerList = myGM20_prune %>% filter(SNP %in% c('AlaAT_L214F','MKK3_E165Q', 'JHI-Hv50k-2016-367342','JHI-Hv50k-2016-408912',
-                                               'JHI-Hv50k-2016-408918','JHI-Hv50k-2016-408820',
-                                               'JHI-Hv50k-2016-408472'))
-
-ld_heatmap(ld) + labs(title = 'LD between SD1, SD2, and Chromosome 6H Markers')+
-  xlab('')+ylab('') +theme(axis.text.x = element_blank())
-
-### Random Correlations ###########
-
-merge(VectorofTimeto5.0[c('taxa','TimeTo5.0')],
-      VectorofTimeto5.6[c('taxa','TimeTo5.6')], by ='taxa', all.x = TRUE) %>%
-  select(TimeTo5.0,TimeTo5.6) %>% cor(.,use = 'complete.obs')
-
-cor(GI3_4P_logFits.w$DeltaGI90,GI3_4P_logFits.w$DeltaGI95, use = 'complete.obs')
-merge(GE3_3P_logFits.W[c('taxa','TimeTo90')],
-      VectorofTimeto90[c('taxa','TimeTo90')], by = 'taxa', all = TRUE) %>%
-  select(TimeTo90.x,TimeTo90.y) %>% cor(use = 'complete.obs', method = 'spearman')
-merge(GE3_3P_logFits.W[c('taxa','TimeTo90')],
-      VectorofTimeto90[c('taxa','TimeTo90')], by = 'taxa', all = TRUE) %>%
-  select(TimeTo90.x,TimeTo90.y) %>% plot()
-
-merge(GE3_3P_logFits.W[c('taxa','TimeTo95')],
-      VectorofTimeto95[c('taxa','TimeTo95')], by = 'taxa', all = TRUE) %>%
-  select(TimeTo95.x,TimeTo95.y) %>% cor(use = 'complete.obs', method = 'spearman')
-
-merge(GE3_3P_logFits.W[c('taxa','TimeTo95')],
-      VectorofTimeto95[c('taxa','TimeTo95')], by = 'taxa', all = TRUE) %>%
-  select(TimeTo95.x,TimeTo95.y) %>% plot()
-
-cor(myGD20_prune$`JHI-Hv50k-2016-367342`, myGD20_prune$`JHI-Hv50k-2016-366325`)
-
-GI3_4P_logFits.w %>% select(taxa,TimeTo5.0) %>% mutate(TimeTo5.0 = ifelse(TimeTo5.0 >250,NA,TimeTo5.0))%>%
-  merge(VectorofTimeto5.0, by = 'taxa') %>%
-  select(TimeTo5.0.x, TimeTo5.0.y) %>% cor(.,use = 'complete.obs')
-GI3_4P_logFits.w %>% select(taxa,TimeTo5.0) %>% mutate(TimeTo5.0 = ifelse(TimeTo5.0 >250,NA,TimeTo5.0))%>%
-  merge(VectorofTimeto5.0, by = 'taxa') %>%
-  select(TimeTo5.0.x, TimeTo5.0.y) %>% plot()
-
-ks.test(x = GI3_4P_logFits.w %>% select(TimeTo5.0) %>% mutate(TimeTo5.0 = ifelse(TimeTo5.0 >250,NA,TimeTo5.0)),
-        y = VectorofTimeto5.0$TimeTo5.0, alternative = c('two.sided')) 
-
-
-
 ##############################
 ### Genomic Prediction #######
 setwd(rprojroot::find_rstudio_root_file())
-load('GenotypeData/myGD_LDpruned_w_KASP.RData')
-load('PhenotypeData/ProcessedData/2020/GGS2020_BLUE_summary_allTP.RData')
+load('SpringBarley/GenotypeData/myGD_LDpruned_w_KASP.RData')
+load('SpringBarley/PhenotypeData/ProcessedData/2020/GGS2020_BLUE_summary_allTP.RData')
 # We are interested in the GP power within our 
 # breeding program so the JIC and naked barleys were excluded
-PopulationKey = read.csv(file = 'GenotypeData/PopulationKey.csv') %>% select(!X)
+PopulationKey = read.csv(file = 'SpringBarley/GenotypeData/PopulationKey.csv') %>% select(!X)
 CULines =PopulationKey %>% filter(Population %in% c("check","C1G","C2G","C1P","base"))
 CUTP1Germs = all_BLUE %>% filter(TP == "TP1" & taxa %in% CULines$taxa &taxa %nin% c('P_5_3','P_8_6'))
 
@@ -1578,7 +1020,7 @@ FoldCVGPSamePopSize = function(Phenotype1, myGD1, numfolds=50,datasplit, trait_n
     subsampled = sort(sample(1:num_entries, sample_size))
     Phenotype = Phenotype1[subsampled]
     myGD = myGD1[subsampled,]
-
+    
     trainingSet = sort(sample(1:sample_size,Training_size))
     testingSet = setdiff(1:sample_size,trainingSet)
     
@@ -1608,15 +1050,15 @@ FoldCVGPSamePopSize = function(Phenotype1, myGD1, numfolds=50,datasplit, trait_n
 
 
 GPPHSCU = rbind(FoldCVGP((PHS.blues %>% filter(taxa %in% CULines$taxa &taxa %nin% c('P_5_3','P_8_6')))$PHS,
-                   myGD = myGD20_pruneCUfilt[,-1]-1, #convert to correct format
-                   datasplit = .8,
-                   trait_name = 'perTP_PHS_withVND'),
+                         myGD = myGD20_pruneCUfilt[,-1]-1, #convert to correct format
+                         datasplit = .8,
+                         trait_name = 'perTP_PHS_withVND'),
                 FoldCVGP((PHS.blues %>% filter(taxa %in% CULines$taxa & 
                                                  taxa %nin% c('P_5_3','P_8_6') &
                                                  taxa %in% Mkk3taxa$taxa))$PHS,
-                   myGD = (myGD20_pruneCUfilt %>% filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
-                   datasplit = .8,
-                   trait_name = 'perTP_PHS_noVND'),
+                         myGD = (myGD20_pruneCUfilt %>% filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
+                         datasplit = .8,
+                         trait_name = 'perTP_PHS_noVND'),
                 FoldCVGPSamePopSize((PHS.blues %>% filter(taxa %in% CULines$taxa &taxa %nin% c('P_5_3','P_8_6')))$PHS,
                                     myGD = myGD20_pruneCUfilt[,-1]-1, #convert to correct format
                                     datasplit = .8,
@@ -1668,16 +1110,16 @@ for( col in GE3_3P_logFits.WCU[,-1]){
                    datasplit = .8,
                    trait_name =paste0('GELogistic_', colnames(GE3_3P_logFits.WCU)[counter],'_withVND'))
   temp2 =  FoldCVGP(col[which(GE3_3P_logFits.WCU$taxa %in% Mkk3taxa$taxa)],
-                   (myGD20_pruneCUfilt[which(missingGE3Plog),] %>%
-                      filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
-                   datasplit = .8,
-                   trait_name =paste0('GELogistic_', colnames(GE3_3P_logFits.WCU)[counter],'_noVND'))
+                    (myGD20_pruneCUfilt[which(missingGE3Plog),] %>%
+                       filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
+                    datasplit = .8,
+                    trait_name =paste0('GELogistic_', colnames(GE3_3P_logFits.WCU)[counter],'_noVND'))
   temp3 = FoldCVGPSamePopSize(col,
                               myGD20_pruneCUfilt[which(missingGE3Plog),-1]-1, #convert to correct format
                               datasplit = .8,
                               trait_name =paste0('GELogistic_', colnames(GE3_3P_logFits.WCU)[counter],'_withVNDSamePop'),
                               sample_size = length(col[which(GE3_3P_logFits.WCU$taxa %in% Mkk3taxa$taxa)]))
-
+  
   GPGElogfits =rbind(GPGElogfits,temp,temp2, temp3)
   
   counter = counter+1
@@ -1698,8 +1140,8 @@ for( col in GE3.FPCA.WCU[,-1]){
   temp2 =  FoldCVGP(col[which(GE3.FPCA.WCU$taxa %in% Mkk3taxa$taxa)],
                     (myGD20_pruneCUfilt[which(missingGE3FPCA),] %>%
                        filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
-                   datasplit = .8,
-                   trait_name =paste0('GEFPCA_',colnames(GE3.FPCA.WCU)[counter],'_noVND'))
+                    datasplit = .8,
+                    trait_name =paste0('GEFPCA_',colnames(GE3.FPCA.WCU)[counter],'_noVND'))
   temp3 = FoldCVGPSamePopSize(col,
                               myGD20_pruneCUfilt[which(missingGE3FPCA),-1]-1, #convert to correct format
                               datasplit = .8,
@@ -1726,8 +1168,8 @@ for( col in GI3_4P_logFits.WCU[,-1]){
   temp2 =  FoldCVGP(col[which(GI3_4P_logFits.WCU$taxa %in% Mkk3taxa$taxa)],
                     (myGD20_pruneCUfilt[which(missingGI4Plog),] %>%
                        filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
-                   datasplit = .8,
-                   trait_name =paste0('GILogistic_', colnames(GI3_4P_logFits.WCU)[counter],'_noVND'))
+                    datasplit = .8,
+                    trait_name =paste0('GILogistic_', colnames(GI3_4P_logFits.WCU)[counter],'_noVND'))
   temp3 =  FoldCVGPSamePopSize(col,
                                myGD20_pruneCUfilt[which(missingGI4Plog),-1]-1, #convert to correct format
                                datasplit = .8,
@@ -1743,7 +1185,7 @@ for( col in GI3_4P_logFits.WCU[,-1]){
 GPGIFPCA = data.frame()
 GI3.FPCA.WCU = GI31920FPCA.ouputs.longer %>% filter(taxa %in% CULines$taxa &taxa %nin% c('P_5_3','P_8_6')) %>%
   mutate(name = mapvalues(name, from = c('TimeTo5.0','TimeTo5.6'),
-                               to = c('fTimeTo5.0','fTimeTo5.6'))) %>% 
+                          to = c('fTimeTo5.0','fTimeTo5.6'))) %>% 
   pivot_wider(values_from = value, names_from = name) %>% select(!FPC4)
 missingGI3FPCA= myGD20_pruneCUfilt$taxa %in% GI3.FPCA.WCU$taxa
 counter = 2
@@ -1753,10 +1195,10 @@ for( col in GI3.FPCA.WCU[,-1]){
                    datasplit = .8,
                    trait_name =paste0('GIFPCA_', colnames(GI3.FPCA.WCU)[counter],'_withVND'))
   temp2 =  FoldCVGP(col[which(GI3.FPCA.WCU$taxa %in% Mkk3taxa$taxa)],
-                   (myGD20_pruneCUfilt[which(missingGI3FPCA),] %>%
-                      filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
-                   datasplit = .8,
-                   trait_name =paste0('GIFPCA_', colnames(GI3.FPCA.WCU)[counter],'_noVND'))
+                    (myGD20_pruneCUfilt[which(missingGI3FPCA),] %>%
+                       filter(taxa %in% Mkk3taxa$taxa))[,-1]-1, #convert to correct format
+                    datasplit = .8,
+                    trait_name =paste0('GIFPCA_', colnames(GI3.FPCA.WCU)[counter],'_noVND'))
   temp3 = FoldCVGPSamePopSize(col,
                               myGD20_pruneCUfilt[which(missingGI3FPCA),-1]-1, #convert to correct format
                               datasplit = .8,
@@ -1766,79 +1208,173 @@ for( col in GI3.FPCA.WCU[,-1]){
   GPGIFPCA =rbind(GPGIFPCA,temp, temp2, temp3)
   counter = counter+1
 }
-# Drop Mkk3_n* from the CU to see what happens. 
 
-# Results of GP on all parameters based on training sets #######
-rbind(GPFiltGElogfits,
-      GPGEFPCA,
-      GPGElogfits,
-      GPPerTP %>% filter(substr(trait,10,12)=='GE3'),
-      GPFiltGIlogfits,
-      GPGIlogfits,
-      GPGIFPCA,
-      GPPerTP%>%filter(substr(trait,10,12)=='GI3'),
-      GPPHSCU) %>%
-  group_by(trait) %>% 
-  summarize(accuracy = mean(correlation))
-
-
+################################
+# setwd('GWAS_OUTPUTS/')
+# load("GE31920PerTP.GWAS.S.RData")
+# load("GE3FPCA1920.GWAS.S.RData")
+# load("GE3LogisticFits1920.GWAS.S.RData")
+# load("GI31920PerTP.GWAS.S.RData")
+# load("GI3FPCA1920.GWAS.S.RData")
+# load("GI3LogisticFits1920.GWAS.S.RData")
 # setwd(rprojroot::find_rstudio_root_file())
-# setwd('SpringBarley/Analysis/All_taxa/FinalOutputsJPEG/')
-# jpeg('GPresults.jpg', 800,600, res = 120)
-rbind(GPGEFPCA%>% mutate(trait = gsub(pattern = 'GE', replacement = '',x =trait)),
-      GPGElogfits%>% mutate(trait = gsub(pattern = 'GE', replacement = '',x =trait)),
-      GPPerTP %>% filter(substr(trait,10,12)=='GE3')%>%
-        mutate(trait = gsub(x=substr(trait,1,11),pattern = 'perTP',replacement = 'per Time Point'))) %>% 
-  group_by(trait, fold) %>% 
-  summarize('Prediction accuracy' = mean(correlation)) %>% ungroup(trait, fold) %>% 
-  separate(trait, sep = '_', into =c('xFacet', 'xMarker')) %>% mutate(yfacetLabel = 'GE') %>%
-  mutate(xMarkerf = factor(xMarker,levels = c('FPC1','FPC2', 'FPC3','fTimeTo90','fTimeTo95','Centering','Lower','Rate',
-                                              'TimeTo90', 'TimeTo95','rTimeTo90','rTimeTo95','TP1GE','TP2GE','TP3GE','TP4GE','TP5GE','TP6GE','TP7GE' )),
-         Model = 'Model framework') %>%
-  ggplot(aes(x = `Prediction accuracy`, y = xMarkerf, group = xMarkerf))+
-  geom_boxplot()+
-  # facet_grid(cols = vars(yfacetLabel), rows = vars(xFacet), scales = 'free_y')+
-  facet_nested(Model+xFacet~yfacetLabel, scales = 'free')+
-  theme_bw()+ylab(NULL)+scale_y_discrete(limits=rev)+
-  xlim(-.2,1) + geom_vline(xintercept = 0)+
-  
-  rbind(GPGIlogfits%>% mutate(trait = gsub(pattern = 'GI', replacement = '',x =trait)),
-              GPGIFPCA %>% mutate(trait = gsub(pattern = 'GI', replacement = '',x =trait)),
-              GPPerTP%>%filter(substr(trait,10,12)=='GI3')%>%
-          mutate(trait = gsub(x=substr(trait,1,11),pattern = 'perTP',replacement = 'per Time Point')),
-              GPPHSCU%>%mutate(trait = gsub(x=trait,pattern = 'perTP',replacement = 'per Time Point'))) %>%
-  group_by(trait, fold) %>% 
-  summarize('Prediction accuracy' = mean(correlation)) %>% ungroup(trait, fold) %>% 
-   separate(trait, sep = '_', into =c('xFacet', 'xMarker')) %>% 
-   mutate(xMarker = mapvalues(xMarker, from =c('Delta','Delta90','Delta95'),
-                           to = c('DeltaGI', 'DeltaGI90','DeltaGI95')),
-          yfacetLabel = 'GI',
-          xMarkerf = factor(xMarker,
-                            levels = c('FPC1','FPC2', 'FPC3','fTimeTo5.0','fTimeTo5.6','Centering','Lower','Rate', 'Upper',
-                                       'TimeTo5.0','DeltaGI90','DeltaGI95','DeltaGI','TP1GI','TP2GI','TP3GI','TP4GI',
-                                       'TP5GI','TP6GI','TP7GI','PHS' )),
-          Model = 'Model framework') %>%
-  ggplot(aes(x = `Prediction accuracy`, y = xMarkerf, group = xMarkerf))+
-  geom_boxplot()+
-  # facet_grid(cols = vars(yfacetLabel), rows = vars(xFacet), scales = 'free_y')+
-  facet_nested(Model+xFacet~yfacetLabel, scales = 'free')+
-  theme_bw()+ ylab(NULL)+scale_y_discrete(limits=rev)+
-  xlim(-.2,1) + geom_vline(xintercept = 0)+
-  plot_layout(ncol = 2)+plot_annotation(tag_levels = 'a')
-# dev.off()
 
-test =  rbind(GPGIlogfits%>% mutate(trait = gsub(pattern = 'GI', replacement = '',x =trait)),
-              GPGIFPCA %>% mutate(trait = gsub(pattern = 'GI', replacement = '',x =trait)),
-              GPPerTP%>%filter(substr(trait,10,12)=='GI3')%>%mutate(trait = gsub(x=substr(trait,1,11),pattern = 'perTP',replacement = 'Time Point')),
-              GPPHSCU%>%mutate(trait = gsub(x=trait,pattern = 'perTP',replacement = 'Time Point'))) %>%
-  group_by(trait, fold) %>% 
-  summarize('Prediction accuracy' = mean(correlation)) %>% ungroup(trait, fold) %>% 
-  mutate(trait = mapvalues(trait, from =c('Delta','Delta90','Delta95'),
-                           to = c('DeltaGI', 'DeltaGI90','DeltaGI95')))
+### PLOTS ######
+### Figure 1 GE Recovered curve plots for FPCA and Logistic, and parameters histograms #########
+GElogPcounts = GE3_3P_logFits.W %>% 
+  pivot_longer(cols = 2:8) %>% filter(!is.na(value))%>% group_by(name) %>% 
+  summarise(n = n()) %>% mutate(FacetLabel = paste0(name,': n=', n)) %>%
+  merge(.,GE3_3P_logFits.W %>% pivot_longer(cols = 2:8),by = 'name') %>%
+  mutate(ModelType = 'Logistic',
+         ParamFiltered = taxa %in% (GE3_3P_logFits.W %>% filter(Lower>0.8))$taxa)
+GEfpcaPcounts = GE31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
+  mutate(FacetLabel = paste0(name,': n=', n)) %>% merge(.,GE31920FPCA.ouputs.longer, by ='name') %>% mutate(ModelType = 'FPCA')
 
-# setwd(rprojroot::find_rstudio_root_file())
-# setwd('SpringBarley/Analysis/All_taxa/FinalOutputsJPEG/')
-# jpeg('GPresMKK3dropping.jpg', 800,600, res = 90)
+GEfpcaRecoveredCurves = GE31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GE31920.FPCA$phi.fun.df$time) %>%
+  pivot_longer(cols = 1:484, values_to = 'GE3', names_to = 'taxa') %>% select(taxa,time,GE3) %>% 
+  mutate(ModelType = 'FPCA fits') %>% 
+  ggplot(aes(x = time, y = GE3, group = taxa))+geom_line(color ='darkgrey')+
+  facet_grid(cols = vars(ModelType))+
+  geom_point(data = All.BluesGE31920%>% filter(taxa %nin% GE3logTaxatoFilter$taxa), color ='blue', size =.9)+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GE')
+
+GElogisticRecoveredCurves = GE3fittedCurves %>% 
+  filter(taxa %nin% GE3logTaxatoFilter$taxa) %>% 
+  mutate(ModelType = 'Logistic fits',
+         ParamFiltered = taxa %in% (GE3_3P_logFits.W %>% filter(Lower>0.8))$taxa) %>%
+  ggplot(aes(x = time, y = GE3estimate, group = taxa))+geom_line(color = 'darkgrey')+
+  facet_grid(cols = vars(ModelType)) +
+  geom_point(data = All.BluesGE31920%>% filter(taxa %nin% GE3logTaxatoFilter$taxa),inherit.aes = F, 
+             aes(x = time, y = GE3), color ='blue', size =.9)+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GE')
+
+GECurveandParamPlot = GEfpcaRecoveredCurves+ 
+  ggplot(GEfpcaPcounts %>%
+           mutate(FacetLabel= mapvalues(FacetLabel, from = c('TimeTo90: n=484','TimeTo95: n=484'),to = c('fTimeTo90: n=484','fTimeTo95: n=484'))),
+         aes(x = value))+geom_histogram()+facet_wrap(vars(FacetLabel),scales = 'free')+theme_bw(base_size = 8)+
+  labs(subtitle = 'FPCA FPCs and derived values')+
+  GElogisticRecoveredCurves+
+  ggplot(GElogPcounts,aes(x = value))+geom_histogram()+
+  facet_wrap(vars(FacetLabel), scales = 'free')+
+  theme_bw(base_size = 8)+theme(legend.position = 'none')+
+  labs(subtitle = 'Logistic parameter and derived values')+
+  plot_layout(design = c('AABBB \n CCDDD'), heights = c(2,3))+
+  plot_annotation(tag_levels = 'a') & 
+  theme(plot.tag.position = c(0, 1),
+        plot.tag = element_text(size = 8, hjust = 0, vjust = 0))
+GECurveandParamPlot
+setwd(rprojroot::find_rstudio_root_file())
+
+pdf('Figure1_GECurveAndParameters.pdf',width =8,height = 6)
+GECurveandParamPlot
+dev.off()
+
+### figure 2 GE Functional Manhattan Plot #####
+
+GEfunctionalModelingManhattan = rbind(GE3FPCATopMarkers,GE3LogisticTopMarkers,
+                                      filtGE3LogisticTopMarkers) %>%  filter(maf >0.07) %>%
+  mutate(ModelTypeParam = paste0(ModelType,trait),
+         ModelType = mapvalues(ModelType, from = c('GE3Logistic','GE3FPCA','FiltGE3Logistic'),
+                               to=c('Logistic','FPCA','Filtered Logistic'))) %>%
+  mutate(trait = factor(trait, levels = c('FPC1','FPC2','FPC3','TimeTo90','TimeTo95','Centering',
+                                          'Lower','Rate','rTimeTo90','rTimeTo95'))) %>%
+  ggplot(aes(x = ordinal, y = log10PVal, shape = ModelType))+
+  geom_point(aes(color = trait), size =2.5) +
+  geom_vline(xintercept = ChromLines)+
+  geom_vline(xintercept = c(9228,10771), color = 'red')+
+  annotate(geom = 'text', x = 9228, y = 22, label = 'AlaAT1')+
+  annotate(geom = 'text', x = 10771, y = 18, label = 'MKK3')+
+  scale_x_continuous(label = c("1H","2H", "3H", "4H", "5H", "6H", "7H", "UN"),
+                     breaks = breaks)+
+  ylab('-log(p-value)')+xlab('Chromosome')+
+  geom_hline(yintercept = -log10(5e-5))+
+  ylim(0,30)+
+  theme_bw()+labs(shape = 'Time series\nmodel',color = 'Parameter') +
+  guides(color = guide_legend(order=2),
+         shape = guide_legend(order=1))
+
+pdf('Figure2_GEFunctionalGWAresults.pdf', 8,5.5)
+GEfunctionalModelingManhattan
+dev.off()
+
+
+### Figure 3 GI recovered curves and parameters plotted for FPCA and logistic curves #######
+GIlogPcounts = GI3_4P_logFits.w %>% select(!c(TimeTo5.6)) %>%
+  mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>%
+  pivot_longer(cols = 2:9) %>% group_by(name)%>%
+  filter(!is.na(value)) %>% summarise(n = n())%>% mutate(FacetLabel = paste0(name,': n=', n)) %>% 
+  merge(.,GI3_4P_logFits.w %>% select(!c(TimeTo5.6)) %>%
+          mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>% pivot_longer(cols = 2:9),
+        by = 'name')
+GIfpcaPcounts = GI31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
+  mutate(FacetLabel= mapvalues(paste0(name,': n=', n), from = c('TimeTo5.0: n=478','TimeTo5.6: n=398'),
+                               to = c('fTimeTo5.0: n=478','fTimeTo5.6: n=398'))) %>% 
+  merge(.,GI31920FPCA.ouputs.longer, by ='name') %>% 
+  mutate(ModelType = 'FPCA')
+
+GIfpcaRecoveredCurves = GI31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GI31920.FPCA$phi.fun.df$time) %>%
+  pivot_longer(cols = 1:484, values_to = 'GI3', names_to = 'taxa') %>%
+  select(taxa,time,GI3) %>% mutate(ModelType = 'FPCA fits') %>% 
+  ggplot(aes(x = time, y = GI3, group = taxa))+geom_line(color ='darkgrey')+
+  facet_grid(cols = vars(ModelType))+
+  geom_point(data = all1920GIBlues %>% filter(taxa %nin% GI3logTaxatoFilter$taxa), color ='blue', size = 0.9)+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GI')
+
+GIlogisticRecoveredCurves = GI3fittedCurves %>% filter(taxa %nin% GI3logTaxatoFilter$taxa) %>% 
+  mutate(ModelType = 'Logistic fits') %>%
+  ggplot(aes(x = time, y = GI3estimate, group = taxa))+geom_line(color ='darkgrey')+
+  facet_grid(cols = vars(ModelType)) +
+  geom_point(data = all1920GIBlues%>% filter(taxa %nin% GI3logTaxatoFilter$taxa),
+             inherit.aes = F, aes(x = time, y = GI3), color ='blue', size = 0.9)+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GI')
+
+GICurveandParamPlot = 
+  GIfpcaRecoveredCurves+ 
+  ggplot(GIfpcaPcounts,aes(x = value))+geom_histogram()+facet_wrap(vars(FacetLabel),scales = 'free')+theme_bw(base_size = 8)+
+  labs(subtitle = 'FPCA FPCs and derived values')+
+  GIlogisticRecoveredCurves+
+  ggplot(GIlogPcounts,aes(x = value))+geom_histogram()+facet_wrap(vars(FacetLabel), scales = 'free')+theme_bw(base_size = 8)+
+  labs(subtitle = 'Logistic parameter and derived values')+
+  plot_layout(design = c('AABBB \n CCDDD'), heights = c(2,3))+
+  plot_annotation(tag_levels = 'a') & 
+  theme(plot.tag.position = c(0, 1),
+        plot.tag = element_text(size = 8, hjust = 0, vjust = 0))
+
+GICurveandParamPlot
+pdf('Figure3_GICurvesAndParameters.pdf', width = 8,height = 6)
+GICurveandParamPlot
+dev.off()
+
+### Figure 4 GI Functional Manhattan #####
+GIfunctionalModelingManhattan = rbind(GI3FPCATopMarkers,
+                                      GI3LogisticTopMarkers,
+                                      filtGI3LogisticTopMarkers) %>%  filter(maf >0.07) %>%
+  mutate(ModelTypeParam = paste0(ModelType,trait),
+         ModelType = mapvalues(ModelType, from = c('GI3Logistic','GI3FPCA','FiltGI3Logistic' ), 
+                               to=c('Logistic','FPCA', 'Filtered Logistic'))) %>%
+  mutate(trait = factor(trait, levels = c('FPC1','FPC2','FPC3','TimeTo5.0','TimeTo5.6','Centering',
+                                          'Lower','Rate','Upper','DeltaGI','DeltaGI90','DeltaGI95'))) %>%
+  ggplot(aes(x = ordinal, y = log10PVal, shape = ModelType))+
+  geom_point(aes(color = trait), size =2.5) +
+  geom_vline(xintercept = ChromLines)+
+  geom_vline(xintercept = c(9228,10771), color = 'red')+
+  annotate(geom = 'text', x = 9228, y = 22, label = 'AlaAT1')+
+  annotate(geom = 'text', x = 10771, y = 18, label = 'MKK3')+
+  scale_x_continuous(label = c("1H","2H", "3H", "4H", "5H", "6H", "7H", "UN"),
+                     breaks = breaks)+
+  ylab('-log(p-value)')+xlab('Chromosome')+
+  geom_hline(yintercept = -log10(5e-5))+
+  ylim(0,30)+
+  theme_bw()+labs(shape = 'Time series\nmodel',color = 'Parameter') +
+  guides(color = guide_legend(order=2),
+         shape = guide_legend(order=1))
+
+pdf('Figure4_GIFunctionalGWAresults.pdf', 8.00,6.00)
+GIfunctionalModelingManhattan
+dev.off()
+
+### Figure 5 Results of GP on all parameters based on training sets #######
+pdf('Figure5_SimpleGP.pdf', 8.00,6.00)
 rbind(GPGEFPCA %>% mutate(trait = gsub(pattern = 'GE', replacement = '',x =trait)),
       GPGElogfits%>% mutate(trait = gsub(pattern = 'GE', replacement = '',x =trait)),
       GPPerTP %>% filter(substr(trait,10,12)=='GE3')%>% 
@@ -1859,7 +1395,7 @@ rbind(GPGEFPCA %>% mutate(trait = gsub(pattern = 'GE', replacement = '',x =trait
   scale_fill_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name ='MKK3 allele\nexcluded',
                     labels = c('None-full',expression(MKK3[N^{"*"}]), 'None-STPS'))+
   theme(legend.text.align = 0)+
-
+  
   rbind(GPGIlogfits%>% mutate(trait = gsub(pattern = 'GI', replacement = '',x =trait)),
         GPGIFPCA %>% mutate(trait = gsub(pattern = 'GI', replacement = '',x =trait)),
         GPPerTP%>%filter(substr(trait,10,12)=='GI3') %>% 
@@ -1888,4 +1424,493 @@ rbind(GPGEFPCA %>% mutate(trait = gsub(pattern = 'GE', replacement = '',x =trait
                     labels = c('None-full',expression(MKK3[N^{"*"}]), 'None-STPS'))+
   theme(legend.text.align = 0)+
   plot_layout(ncol = 2, guides = 'collect')+plot_annotation(tag_levels = 'a')
-# dev.off()
+dev.off()
+
+### Figure 6 Leave one TP out cross validation ######
+setwd(rprojroot::find_rstudio_root_file())
+load("Output/FPCA_GEGI_predictions.RData")
+load("Output/Logistic_GEGI_predictions.RData")
+
+rectangles = FPCA_GEGI_predictions %>% select(TP, Trait, Dropped) %>% unique()%>%
+  mutate(Top = 5, Bottom = -5, TraitLabel = paste0('Trait: ', Trait), TP = Dropped) %>%
+  filter(Dropped !='None') %>% mutate(alpha = 0.05)
+
+FPCALogisticPrediction = Logistic_GEGI_predictions %>%
+  mutate(TraitLabel = paste0('Model: Logistic; Trait: ', Trait)) %>%
+  rbind(FPCA_GEGI_predictions %>%
+          mutate(TraitLabel = paste0('Model: FPCA; Trait: ', Trait))) %>% 
+  mutate(TraitLabel = factor(TraitLabel,levels = c('Model: FPCA; Trait: GE',
+                                                   'Model: Logistic; Trait: GE',
+                                                   'Model: FPCA; Trait: GI',
+                                                   'Model: Logistic; Trait: GI')),
+         MethodLabel = factor(mapvalues(Method, from = c('TrainingSetCorrelations','GPP','GPT'), 
+                                        to = c('Training Set\nAccuracy',
+                                               'Testing Set\nGPP Accuracy', 'Testing Set\nGPT Accuracy')),
+                              levels = c('Training Set\nAccuracy',
+                                         'Testing Set\nGPT Accuracy','Testing Set\nGPP Accuracy'),
+                              ordered = TRUE),
+         TPModel = paste0(TP,':',Model))
+Rectangles2 = rbind(rectangles %>%
+                      mutate(TraitLabel = paste0('Model: Logistic; Trait: ', Trait),
+                             Model = 'Logistic'),
+                    rectangles %>%
+                      mutate(TraitLabel = paste0('Model: FPCA; Trait: ', Trait),
+                             Model = 'FPCA')) %>%
+  mutate(TraitLabel = factor(TraitLabel,levels = c('Model: FPCA; Trait: GE',
+                                                   'Model: Logistic; Trait: GE',
+                                                   'Model: FPCA; Trait: GI',
+                                                   'Model: Logistic; Trait: GI')),
+         TPModel = paste0(TP,':',Model))
+
+library(ggh4x)
+pdf('Figure6_LeaveOneTPoutGP.pdf', 10,8)
+FPCALogisticPrediction %>% mutate('TP Dropped' = 'Time point masked') %>%
+  ggplot(aes(x = TP, y = correlation, color = MethodLabel))+
+  geom_boxplot(outlier.size = 0.5) +
+  facet_nested(`TP Dropped`+Dropped  ~ TraitLabel)+
+  scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a'))+
+  geom_hline(yintercept = 0, color = 'black') +
+  xlab('Time point of prediction')+
+  labs(color = 'Prediction \nMethod') +
+  geom_tile(data = Rectangles2 %>% mutate('TP Dropped' = 'Time point masked'),
+            inherit.aes = FALSE,
+            aes(x = TP, fill = NA,y = 0), alpha = 0.05,
+            height = 2, width = 1, fill = 'lightgrey') +
+  theme_bw(base_size = 10) +
+  ylab('Prediction accuracy')
+dev.off()
+
+
+### Figure 7 Time To thresholds vs PHS and other things ######
+setwd(rprojroot::find_rstudio_root_file())
+load("PhenotypeData/ProcessedData/PHS_BLUEs_GGS1920.RData")
+PopulationKey = read.csv(file = 'GenotypeData/PopulationKey.csv') %>% select(!X)
+CULines =PopulationKey %>% filter(Population %in% c("check","C1G","C2G","C1P","base"))
+
+#PHS with ftimeto5.0 and ftimeto95 in ONLY THE CU LINES
+PHS.blues %>% merge(.,
+                    all_BLUE %>% select(TP, taxa, GE3,GI3scale)%>%filter(TP =='TP1'),
+                    by = 'taxa')%>%
+  rename('GE TP1' =GE3, 'GI TP1' = GI3scale) %>%
+  merge(.,VectorofTimeto95[c('taxa',"TimeTo95")], by = 'taxa') %>%
+  merge(.,VectorofTimeto5.0[c('taxa','TimeTo5.0')], by = 'taxa') %>%
+  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342', 'AlaAT_L214F')], by = 'taxa',all.x = TRUE) %>% 
+  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>% 
+  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
+         AlaAT = round(AlaAT_L214F),
+         AlaATcode = mapvalues(AlaAT,from =c(0,2,1), to = c('N','D','Het')),
+         MKK3_E165Q = paste(MKK3_E165Q),
+         SD2Code= mapvalues(SD2, from = c('00','20','22'), to= c('Dormant','Non-Dormant','Very \n Non-Dormant'))) %>% 
+  rename(fTimeTo95 = TimeTo95, fTimeTo5.0 = TimeTo5.0) %>%
+  filter(taxa %in% CULines$taxa) %>%
+  gatherpairs(PHS, 'GE TP1', 'GI TP1',fTimeTo95,fTimeTo5.0) %>%
+  ggplot(aes(x = .xvalue, y = .yvalue, color = SD2Code))+
+  geom_point()+
+  scale_colour_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name = "*HvMKK3* \nallele", 
+                      labels = expression(MKK3[D],MKK3[N],MKK3[N^{"*"}]))+theme_bw() +
+  theme(legend.title = element_markdown())+
+  facet_grid(cols = vars(.xkey), rows = vars(.ykey), scales = 'free',switch = "y")+
+  xlab('Values')+ylab('Values')
+
+#lets try with ggally to get what I want...
+#This is mostly what I want expect for the markdown problems with the labeller. 
+pdf('Figure7_PHScorrelations.pdf', 10.00,6.00)
+PHS.blues %>% merge(.,
+                    all_BLUE %>% select(TP, taxa, GE3,GI3scale)%>%filter(TP =='TP1'),
+                    by = 'taxa')%>%
+  rename('GETP1' =GE3, 'GITP1' = GI3scale) %>%
+  merge(.,VectorofTimeto95[c('taxa',"TimeTo95")], by = 'taxa') %>%
+  merge(.,VectorofTimeto5.0[c('taxa','TimeTo5.0')], by = 'taxa') %>%
+  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342', 'AlaAT_L214F')], by = 'taxa',all.x = TRUE) %>%
+  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
+  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
+         MKK3_E165Q = paste(MKK3_E165Q),
+         SD2Code= mapvalues(SD2, from = c('00','20','22'), 
+                            to =c('MKK3 D','MKK3 N','MKK3 N*'))) %>%
+  rename(fTimeTo95 = TimeTo95, fTimeTo5.0 = TimeTo5.0) %>%
+  filter(taxa %in% CULines$taxa) %>%
+  ggpairs(data = ., 
+          columns = c('PHS', 'GETP1', 'GITP1','fTimeTo95','fTimeTo5.0'),
+          ggplot2::aes(color = SD2Code))+theme_bw()+theme(axis.text = element_text(size = 6))
+dev.off()
+
+### Sup Table 1 and 2 significant per TP and Functional Markers for the tables ######
+# per TP
+rbind(GI3perTPTopMarkers,GE3perTPTopMarkers) %>%  filter(maf > 0.07 &P.value<5e-5) %>% 
+  mutate(log10PVal = round(log10PVal,2)) %>%
+  select(ModelType,trait, SNP,Chromosome, Position,maf, log10PVal) 
+
+#for functional analysis
+SigMarkers = rbind(GI3FPCATopMarkers, 
+                   GE3FPCATopMarkers,
+                   GI3LogisticTopMarkers,
+                   GE3LogisticTopMarkers,
+                   filtGE3LogisticTopMarkers,
+                   filtGI3LogisticTopMarkers) %>%  filter(maf >0.07 & P.value < 5e-5) %>%
+  arrange(Chromosome, Position)
+View(SigMarkers %>% select(ModelType,trait,SNP, Chromosome, Position,maf, P.value))
+SigMarkers %>%
+  arrange(ModelType, trait, Chromosome, Position, P.value) %>%
+  mutate(log10PVal = round(log10PVal,2)) %>%
+  select(ModelType,trait, SNP,Chromosome, Position, maf, log10PVal)%>%
+  merge(., rbind(
+    GE3_3P_logFits.W %>% 
+      pivot_longer(cols = 2:8) %>% filter(!is.na(value))%>% group_by(name) %>% 
+      summarise(n = n()) %>%  mutate(ModelType = 'GE3Logistic') %>% rename(trait = name),
+    GE3_3P_logFits.W %>% filter(Lower<0.8) %>%
+      pivot_longer(cols = 2:8) %>% filter(!is.na(value))%>% group_by(name) %>% 
+      summarise(n = n()) %>%  mutate(ModelType = 'FiltGE3Logistic') %>% rename(trait = name),
+    GE31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
+      mutate(ModelType = 'GE3FPCA') %>% rename(trait = name),
+    GI3_4P_logFits.w %>% 
+      mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>%
+      pivot_longer(cols = 2:10) %>% group_by(name)%>%
+      filter(!is.na(value)) %>% summarise(n = n())%>%mutate(ModelType = 'GI3Logistic') %>% 
+      rename(trait = name),
+    GI3_4P_logFits.w %>% filter(Lower<5.0) %>%  
+      mutate(TimeTo5.0 = as.numeric(ifelse(TimeTo5.0<250,TimeTo5.0,NA)))%>%
+      pivot_longer(cols = 2:10) %>% group_by(name)%>%
+      filter(!is.na(value)) %>% summarise(n = n())%>% mutate(ModelType = 'FiltGI3Logistic') %>% 
+      rename(trait = name),
+    GI31920FPCA.ouputs.longer %>% group_by(name) %>% filter(!(is.na(value)))%>%summarise(n = n()) %>% 
+      rename(trait = name) %>% mutate(ModelType = 'GI3FPCA')), by = c('ModelType','trait'),all.X =TRUE)%>%
+  mutate(ModelType = mapvalues(ModelType, 
+                               from=c("GI3Logistic","GI3FPCA","GE3Logistic","FiltGE3Logistic","FiltGI3Logistic","GE3FPCA"),
+                               to=c("GILogistic","GIFPCA","GELogistic","GELogisticFilt","GILogisticFilt","GEFPCA")))%>%
+  rename(Chr = Chromosome, Trait = trait, '-log(p-value)' = log10PVal) %>%
+  mutate('Marker Region' = ifelse(Chr==5 & Position>585246000 & Position < 600000000, 'SD2',
+                                  ifelse(Chr==5 &Position >442000000 & Position <443000000,'SD1',NA)),
+         'Gene Candidate' = mapvalues(`Marker Region`, from = c('SD1','SD2'), to = c('HvAlaAT1','HvMKK3'))) %>%
+  tail(.,17)
+
+uniqueMarkers = SigMarkers %>% select(SNP) %>% mutate(SNP = as.character(SNP)) %>% unique()
+ModelList = c(rep("GIFPCA",5),
+              rep("GEFPCA",5),
+              rep("GILogistic",8),
+              rep("GELogistic",7),
+              rep("GELogisticFilt",7),
+              rep("GILogisticFilt",8))
+TraitList = c(GI3FPCA1920.GWAS.S.traits,GE3FPCA1920.GWAS.S.traits,GI3LogisticFits1920.GWAS.S.Traits,
+              GE3LogisticFits1920.GWAS.S.Traits,filtGE3LogisticFits1920.GWAS.S.Traits,filtGI3LogisticFits1920.GWAS.S.Traits)
+AllPvals = data.frame()
+Countout = 1
+counter = 1
+for (i in c(GI3FPCA1920.GWAS.S,GE3FPCA1920.GWAS.S,GI3LogisticFits1920.GWAS.S,GE3LogisticFits1920.GWAS.S,
+            FiltGE3LogisticFits1920.GWAS.S,FiltGI3LogisticFits1920.GWAS.S)){
+  print(head(i))
+  AllPvals = rbind(i %>% mutate(SNP = as.character(SNP))%>% filter(SNP %in% uniqueMarkers$SNP) %>% 
+                     select(SNP,Chromosome, Position,maf, log10PVal) %>%
+                     mutate(ModelType =ModelList[counter],
+                            Trait = TraitList[counter])
+                   ,AllPvals)
+  counter =counter+1  
+}
+AllPvals %>% colnames()
+AllPvals %>%select(!maf)%>%pivot_wider(names_from = c(ModelType,Trait), names_sep = '_', values_from = log10PVal)
+
+
+### Sup figure 1 GE FPCA models FPC effects coloring ####
+jpeg(filename = 'GEFPCscolored.jpg', 700,350, res = 120)
+GE31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GE31920.FPCA$phi.fun.df$time) %>%
+  pivot_longer(cols = 1:484, values_to = 'GE3', names_to = 'taxa') %>%
+  select(taxa,time,GE3) %>% mutate(ModelType = 'FPC1') %>% 
+  merge(GE31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
+  ggplot(aes(x = time, y = GE3, group = taxa))+geom_line(aes(color = FPC1))+
+  facet_grid(cols = vars(ModelType))+
+  # labs(subtitle = 'FPCA fits')+
+  # geom_point(data = All.BluesGE31920%>% filter(taxa %nin% GE3logTaxatoFilter$taxa), color ='blue', size =.9)+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GE') +
+  GE31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GE31920.FPCA$phi.fun.df$time) %>%
+  pivot_longer(cols = 1:484, values_to = 'GE3', names_to = 'taxa') %>%
+  select(taxa,time,GE3) %>% mutate(ModelType = 'FPC2') %>% 
+  merge(GE31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
+  ggplot(aes(x = time, y = GE3, group = taxa))+geom_line(aes(color = FPC2))+
+  facet_grid(cols = vars(ModelType))+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GE')
+dev.off()
+
+### Sup figure 2 GI FPCA models FPC effects coloring #####
+jpeg(filename = 'GIFPCscolored.jpg', 700,350, res = 120)
+GI31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GI31920.FPCA$phi.fun.df$time) %>%
+  pivot_longer(cols = 1:484, values_to = 'GI3', names_to = 'taxa') %>%
+  select(taxa,time,GI3) %>% mutate(ModelType = 'FPC1') %>% 
+  merge(GI31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
+  ggplot(aes(x = time, y = GI3, group = taxa))+geom_line(aes(color = FPC1))+
+  facet_grid(cols = vars(ModelType))+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GI') +
+  GI31920.FPCA$RecoveredCurves %>% as.data.frame() %>% mutate(time = GI31920.FPCA$phi.fun.df$time) %>%
+  pivot_longer(cols = 1:484, values_to = 'GI3', names_to = 'taxa') %>%
+  select(taxa,time,GI3) %>% mutate(ModelType = 'FPC2') %>% 
+  merge(GI31920.FPCA$PCs_withTaxa, all.x = TRUE, by = 'taxa') %>%
+  ggplot(aes(x = time, y = GI3, group = taxa))+geom_line(aes(color = FPC2))+
+  facet_grid(cols = vars(ModelType))+
+  theme_bw(base_size = 8) +xlab('Time')+ylab('GI')
+dev.off()
+
+### Sup Figure 3 per time point Manhattan plot #####
+jpeg('perTPModeling.jpg', 800,400, res = 120)
+rbind(GI3perTPTopMarkers,GE3perTPTopMarkers) %>%
+  mutate(ModelType = mapvalues(ModelType, from = c('GE3 per Time Point','GI3 per Time Point'),
+                               to =c('GE','GI') )) %>%
+  filter(maf >0.07) %>%
+  mutate(ModelTypeParam = paste0(ModelType,trait),
+         trait = substr(trait,1,3)) %>%
+  ggplot(aes(x = ordinal, y = log10PVal, shape = ModelType))+
+  geom_point(aes(color = trait), size =2.5) +
+  geom_vline(xintercept = ChromLines)+
+  geom_vline(xintercept = c(9228,10771), color = 'red')+
+  annotate(geom = 'text', x = 9228, y = 22, label = 'AlaAt')+
+  annotate(geom = 'text', x = 10771, y = 18, label = 'MKK3')+
+  scale_x_continuous(label = c("1H","2H", "3H", "4H", "5H", "6H", "7H", "UN"),
+                     breaks = breaks)+
+  ylab('-log(p-value)')+xlab('Chromosome')+
+  geom_hline(yintercept = -log10(5e-5))+
+  theme_bw()+labs(color = 'Time point',shape = 'Trait')+
+  guides(color = guide_legend(order=2),
+         shape = guide_legend(order=1))
+
+dev.off()
+
+### Sup Figure 4 GE Logistic Parameters correlations and colored by MKK3 status #########
+jpeg(filename = 'GELogParamsScaterplot.jpg',700,500,res= 120 )
+merge(GE3_3P_logFits.W%>%select(taxa, Lower,Rate, Centering) %>%
+        pivot_longer(.,names_to = 'Xnames',values_to = 'Xvalues', cols = c(Lower,Rate,Centering)),
+      GE3_3P_logFits.W%>%select(taxa, Lower,Rate, Centering), by = 'taxa')%>%
+  pivot_longer(.,names_to = 'Ynames',values_to = 'Yvalues', cols = c(Lower,Rate,Centering)) %>%
+  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342')], by = 'taxa',all.x = TRUE) %>% 
+  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
+  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
+         MKK3_E165Q = paste(MKK3_E165Q),
+         SD2Code= mapvalues(SD2, from = c('00','20','22'), 
+                            to = c('D','ND','VND'))) %>%
+  ggplot(aes(x = Xvalues, y = Yvalues, color = SD2Code))+geom_point()+
+  facet_grid(rows = vars(Ynames), cols = vars(Xnames), scales = 'free')+theme_bw() +
+  scale_colour_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name = "*HvMKK3* \nallele", 
+                      labels = expression(MKK3[D],MKK3[N],MKK3[N^{"*"}]))+
+  theme(legend.title = element_markdown())+
+  xlab('Values')+ylab('Values')
+dev.off()
+
+
+# set dplyr functions
+select <- dplyr::select; rename <- dplyr::rename; mutate <- dplyr::mutate; 
+summarize <- dplyr::summarize; arrange <- dplyr::arrange; slice <- dplyr::slice; filter <- dplyr::filter; recode<-dplyr::recode
+
+# remove obs for setosa
+setwd(rprojroot::find_rstudio_root_file())
+jpeg(filename = 'GELogParamsGGallyPlot.jpg',700,500,res= 120 )
+GE3_3P_logFits.W%>%select(taxa, Lower,Rate, Centering) %>%
+  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342')], by = 'taxa',all.x = TRUE) %>% 
+  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
+  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
+         MKK3_E165Q = paste(MKK3_E165Q),
+         SD2Code= mapvalues(SD2, from = c('00','20','22'), 
+                            to = c('MKK3 D','MKK3 N','MKK3 N*'))) %>%
+  ggpairs(data = ., columns = c('Lower','Rate','Centering'),
+          ggplot2::aes(color = SD2Code))+theme_bw() 
+# scale_color_manual(values=c('MKK3<sub>D</sub>'="#66c2a5",'MKK3<sub>N</sub>'='#fc8d62','MKK3<sub>N*</sub>'='#8da0cb',"Overall Corr"="black"))
+dev.off()
+
+
+### Sup Figure 5 Time to 95 and 90 GE logistic models png histograms KS tests  ######
+testing = data.frame(taxa = myGD20_prune$taxa,
+                     Chr6mk = paste0(round(myGD20_prune$`JHI-Hv50k-2016-408912`,0)),
+                     SDHaplo = paste0(round(myGD20_prune$AlaAT_L214F,0),
+                                      round(myGD20_prune$`JHI-Hv50k-2016-367342`,0),
+                                      myGD20_prune$MKK3_E165Q)) %>%
+  merge(VectorofTimeto95[c('taxa','TimeTo95')], by = 'taxa',all = TRUE) %>% rename(fTimeTo95 = TimeTo95) %>%
+  merge(GE3_3P_logFits.W[c('taxa','TimeTo95')],by ='taxa', all = TRUE) %>%
+  merge(VectorofTimeto90[c('taxa','TimeTo90')], by = 'taxa',all = TRUE) %>% rename(fTimeTo90 = TimeTo90) %>%
+  merge(GE3_3P_logFits.W[c('taxa','TimeTo90')],by ='taxa', all = TRUE)
+cor(as.numeric(testing$Chr6mk), testing$TimeTo90, use = 'complete.obs')
+testing %>% select(TimeTo90, fTimeTo90, TimeTo95, fTimeTo95) %>% 
+  pairs(.,lower.panel = upper.panel,upper.panel = panel.cor)
+
+timetoDormbreaksum = testing %>% 
+  pivot_longer(cols =c(TimeTo90, fTimeTo90, TimeTo95, fTimeTo95)) %>%
+  group_by(name) %>%  filter(!is.na(value)) %>%
+  summarize(Mean = mean(value),
+            '  0th Percentile' = quantile(value)[1],
+            ' 25th Percentile' = quantile(value)[2],
+            ' 50th Percentile, \n Median' = quantile(value)[3],
+            ' 75th Percentile' = quantile(value)[4],
+            '100th Percentile' = range(value)[2]) %>% 
+  pivot_longer(cols = !name, names_to = 'Statistic') %>%
+  mutate(linetype = ifelse(Statistic == 'Mean','solid','dashed'))
+
+jpeg('TimeToDormancyBreakHist.jpg', 700,500, res = 120)
+testing %>%  pivot_longer(cols =c(TimeTo90, fTimeTo90, TimeTo95, fTimeTo95)) %>% 
+  filter(value<100) %>%
+  ggplot(aes(x= value)) +facet_wrap(vars(name))+geom_histogram()+
+  geom_vline(data = timetoDormbreaksum,
+             aes(xintercept = value, color = Statistic, linetype =linetype), size = 1.6) +
+  xlim(0, 100) + guides(linetype = FALSE) + theme_bw() +xlab('Estimated time to threshold')
+dev.off()
+
+ks.test(x = testing$TimeTo90, y = testing$fTimeTo90, alternative = c('two.sided')) 
+ks.test(x = testing$TimeTo95, y = testing$fTimeTo95, alternative = c('two.sided')) 
+t.test(x = testing$TimeTo90, y = testing$fTimeTo90, alternative = c('two.sided')) 
+t.test(x = testing$TimeTo95, y = testing$fTimeTo95, alternative = c('two.sided')) 
+
+
+
+### Sup Figure 6 GI Logistic parameters Correlations and colored by MKK3 Status ######
+
+jpeg(filename = 'GILogParamsScaterplot.jpg',700,500,res= 120 )
+merge(GI3_4P_logFits.w%>%select(taxa, Lower,Rate, Centering, Upper) %>%
+        pivot_longer(.,names_to = 'Xnames',values_to = 'Xvalues', cols = c(Lower,Rate,Centering,Upper)),
+      GI3_4P_logFits.w%>%select(taxa, Lower,Rate, Centering, Upper), by = 'taxa')%>%
+  pivot_longer(.,names_to = 'Ynames',values_to = 'Yvalues', cols = c(Lower,Rate,Centering,Upper)) %>%
+  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342')], by = 'taxa',all.x = TRUE) %>% 
+  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
+  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
+         MKK3_E165Q = paste(MKK3_E165Q),
+         SD2Code= mapvalues(SD2, from = c('00','20','22'), to= c('Dormant','Non-Dormant','Very \n Non-Dormant'))) %>%
+  ggplot(aes(x = Xvalues, y = Yvalues, color = SD2Code))+geom_point()+
+  facet_grid(rows = vars(Ynames), cols = vars(Xnames), scales = 'free')+theme_bw() +
+  scale_colour_manual(values = c('#66c2a5','#fc8d62','#8da0cb'),name = "*HvMKK3* \nallele", 
+                      labels = expression(MKK3[D],MKK3[N],MKK3[N^{"*"}]))+
+  theme(legend.title = element_markdown())+
+  xlab('Values')+ylab('Values')
+dev.off()
+
+jpeg(filename = 'GILogParamsGGallyPlot.jpg',700,500,res= 120 )
+data.frame(taxa = GI3_4P_logFits.w$taxa,
+           Rate = as.vector(GI3_4P_logFits.w$Rate),
+           Upper = as.vector(GI3_4P_logFits.w$Upper),
+           Centering = as.vector(GI3_4P_logFits.w$Centering),
+           Lower = as.vector(GI3_4P_logFits.w$Lower)) %>%
+  merge(., myGD20_prune[c('taxa','MKK3_E165Q','JHI-Hv50k-2016-367342')], by = 'taxa',all.x = TRUE) %>% 
+  filter(MKK3_E165Q != 1 & `JHI-Hv50k-2016-367342` != 1)%>%
+  mutate(SD2 = paste0(round(`JHI-Hv50k-2016-367342`),round(MKK3_E165Q)),
+         MKK3_E165Q = paste(MKK3_E165Q),
+         SD2Code= mapvalues(SD2, from = c('00','20','22'), 
+                            to =c('MKK3 D','MKK3 N','MKK3 N*'))) %>%
+  ggpairs(data = ., 
+          columns = c('Lower','Rate','Centering','Upper'),
+          ggplot2::aes(color = SD2Code))+theme_bw()
+# scale_color_manual(values=c('MKK3<sub>D</sub>'="#66c2a5",'MKK3<sub>N</sub>'='#fc8d62','MKK3<sub>N/*</sub>'='#8da0cb',"Overall Corr"="black"))
+dev.off()
+
+
+### Sup Figure 7 Some examples of poor GI fits #####
+jpeg('PoorGILogFits.jpg', 500,400, res = 120)
+GI3fittedCurves %>% filter(taxa %nin% GI3logTaxatoFilter$taxa) %>% 
+  mutate(ModelType = 'Logistic fits with rate < -10') %>% filter(taxa %in% (GI3_4P_logFits.w %>% filter(Rate < -10))$taxa)%>%
+  ggplot(aes(x = time, y = GI3estimate, group = taxa, color = taxa))+geom_line(size = 1.5)+
+  facet_grid(cols = vars(ModelType)) +
+  geom_point(data = all1920GIBlues%>% filter(taxa %nin% GI3logTaxatoFilter$taxa)%>% 
+               filter(taxa %in% (GI3_4P_logFits.w %>% filter(Rate < -10))$taxa),
+             inherit.aes = F, aes(x = time, y = GI3,color = taxa), size = 1.5)+
+  theme_bw(base_size = 10 ) +xlab('Time')+ylab('GI') +labs(color = 'Line')
+dev.off()
+### Distributions of fTimeto5.0 vs TimeTo5.0
+jpeg('TimeTo5thresholdsfpcavslogsitic.jpg', 500,400, res = 120)
+join(VectorofTimeto5.0 %>% select(taxa, TimeTo5.0) %>% rename(fTimeTo5.0 = TimeTo5.0),
+     GI3_4P_logFits %>% filter(term == 'TimeTo5.0') %>% select(taxa, estimate) %>%
+       filter(estimate<250) %>%
+       rename(TimeTo5.0 = estimate)) %>%
+  pivot_longer(cols = !taxa) %>%
+  ggplot(aes(x = value))+geom_histogram()+
+  facet_wrap(vars(name), ncol = 1)+
+  geom_vline(data = join(VectorofTimeto5.0 %>% select(taxa, TimeTo5.0) %>% rename(fTimeTo5.0 = TimeTo5.0),
+                         GI3_4P_logFits %>% filter(term == 'TimeTo5.0') %>% select(taxa, estimate) %>%
+                           filter(estimate<250) %>%
+                           rename(TimeTo5.0 = estimate)) %>%  
+               pivot_longer(cols = !taxa)%>% filter(!is.na(value)) %>%
+               group_by(name) %>% 
+               summarize(Mean = mean(value),
+                         '  0th Percentile' = quantile(value)[1],
+                         ' 25th Percentile' = quantile(value)[2],
+                         ' 50th Percentile;\nMedian' = quantile(value)[3],
+                         ' 75th Percentile' = quantile(value)[4]) %>%
+               pivot_longer(cols = !name, names_to = 'Statistic') %>%
+               mutate(linetype = ifelse(Statistic == 'Mean','solid','dashed')),
+             aes(xintercept = value, color = Statistic), size = 1.6)+
+  xlab('Time to threshold') +theme_bw()
+dev.off()
+
+
+
+
+### LD between things.  #############
+myGM20_prune %>% filter(Chromosome==6 & Position>472000000 & Position<474000000)
+ld = myGD20_prune %>% select(AlaAT_L214F,MKK3_E165Q, `JHI-Hv50k-2016-367342`,`JHI-Hv50k-2016-408912`,
+                             `JHI-Hv50k-2016-408918`,`JHI-Hv50k-2016-408820`,
+                             `JHI-Hv50k-2016-408472`)
+markerList = myGM20_prune %>% filter(SNP %in% c('AlaAT_L214F','MKK3_E165Q', 'JHI-Hv50k-2016-367342','JHI-Hv50k-2016-408912',
+                                                'JHI-Hv50k-2016-408918','JHI-Hv50k-2016-408820',
+                                                'JHI-Hv50k-2016-408472'))
+
+df = ld
+
+ld_heatmap=function(df){
+  ld <- as.matrix(round(df,0))
+  
+  if(c(-1,3,4) %in% ld){
+    ld[which(ld==3)]=2
+    ld[which(ld==4)]=2
+    ld[which(ld== -1)]=0
+  }
+  
+  LD <- LD.Measures(donnees=ld,  na.presence=F)
+  #LD$loc1=as.character(LD$loc1); LD$loc2=as.character(LD$loc2)
+  r2 <- matrix(0, nrow=ncol(df), ncol=ncol(df))
+  r2[lower.tri(r2, diag=FALSE)] <- LD$r2
+  r2 <- t(r2)
+  r2 <- as.data.frame(round(r2, 5))
+  diag(r2) <- 1
+  r2[lower.tri(r2)] = NA
+  rownames(r2)=colnames(df); colnames(r2)=rownames(r2)
+  r_2=melt(as.matrix(r2), na.rm=T)
+  
+  r_2  
+  graphic = ggplot(r_2, aes(Var2, Var1, fill = value))+
+    geom_tile(color = "white")+
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                         midpoint = 0.5, limit = c(0,1), space = "Lab", name="r2") +
+    theme_classic() +
+    geom_text(aes(label = value))+theme_bw()#+    ggtitle(paste("LD r2 from",colnames(r2)[1],"-", colnames(r2)[length(colnames(r2))], sep=" " ))
+  return(graphic)
+}
+
+ld_heatmap(ld) + labs(title = 'LD between SD1, SD2, and Chromosome 6H Markers')+
+  xlab('')+ylab('') +theme(axis.text.x = element_blank())
+
+### Random Correlations ###########
+
+merge(VectorofTimeto5.0[c('taxa','TimeTo5.0')],
+      VectorofTimeto5.6[c('taxa','TimeTo5.6')], by ='taxa', all.x = TRUE) %>%
+  select(TimeTo5.0,TimeTo5.6) %>% cor(.,use = 'complete.obs')
+
+cor(GI3_4P_logFits.w$DeltaGI90,GI3_4P_logFits.w$DeltaGI95, use = 'complete.obs')
+merge(GE3_3P_logFits.W[c('taxa','TimeTo90')],
+      VectorofTimeto90[c('taxa','TimeTo90')], by = 'taxa', all = TRUE) %>%
+  select(TimeTo90.x,TimeTo90.y) %>% cor(use = 'complete.obs', method = 'spearman')
+merge(GE3_3P_logFits.W[c('taxa','TimeTo90')],
+      VectorofTimeto90[c('taxa','TimeTo90')], by = 'taxa', all = TRUE) %>%
+  select(TimeTo90.x,TimeTo90.y) %>% plot()
+
+merge(GE3_3P_logFits.W[c('taxa','TimeTo95')],
+      VectorofTimeto95[c('taxa','TimeTo95')], by = 'taxa', all = TRUE) %>%
+  select(TimeTo95.x,TimeTo95.y) %>% cor(use = 'complete.obs', method = 'spearman')
+
+merge(GE3_3P_logFits.W[c('taxa','TimeTo95')],
+      VectorofTimeto95[c('taxa','TimeTo95')], by = 'taxa', all = TRUE) %>%
+  select(TimeTo95.x,TimeTo95.y) %>% plot()
+
+cor(myGD20_prune$`JHI-Hv50k-2016-367342`, myGD20_prune$`JHI-Hv50k-2016-366325`)
+
+GI3_4P_logFits.w %>% select(taxa,TimeTo5.0) %>% mutate(TimeTo5.0 = ifelse(TimeTo5.0 >250,NA,TimeTo5.0))%>%
+  merge(VectorofTimeto5.0, by = 'taxa') %>%
+  select(TimeTo5.0.x, TimeTo5.0.y) %>% cor(.,use = 'complete.obs')
+GI3_4P_logFits.w %>% select(taxa,TimeTo5.0) %>% mutate(TimeTo5.0 = ifelse(TimeTo5.0 >250,NA,TimeTo5.0))%>%
+  merge(VectorofTimeto5.0, by = 'taxa') %>%
+  select(TimeTo5.0.x, TimeTo5.0.y) %>% plot()
+
+ks.test(x = GI3_4P_logFits.w %>% select(TimeTo5.0) %>% mutate(TimeTo5.0 = ifelse(TimeTo5.0 >250,NA,TimeTo5.0)),
+        y = VectorofTimeto5.0$TimeTo5.0, alternative = c('two.sided')) 
+
+
+
+
